@@ -40,6 +40,7 @@ def show_in_fiftyone(cfg: DictConfig) -> None:
             pxt_table=pxt_table,
             image=pxt_table.image,
             label=pxt_table.label,
+            index=pxt_table.index,
             connected_components=pxt_table.connected_components,
             bounding_boxes=pxt_table.bounding_boxes,
             random_points=pxt_table.random_points,

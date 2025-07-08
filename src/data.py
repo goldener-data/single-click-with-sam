@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import os
-from functools import partial
 
-from typing import Any, Optional, Callable
+from typing import Any, Optional
 
 import cv2
 import fiftyone as fo
@@ -158,6 +157,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
         self,
         pxt_table: pxt.Table,
         image: exprs.Expr,
+        index: exprs.Expr,
         label: exprs.Expr,
         connected_components: exprs.Expr,
         bounding_boxes: exprs.Expr,
@@ -170,55 +170,44 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
         super().__init__(
             dataset_dir=dataset_dir, shuffle=None, seed=None, max_samples=None
         )
-        self._labels = {
-            "connected_components": (connected_components, fo.Segmentation),
-            "bounding_boxes": (bounding_boxes, fo.Detection),
-            "random_points": (random_points, fo.Keypoint),
-        }
-        if sam_logits is not None:
-            self._labels["sam_logits"] = (sam_logits, fo.Heatmap)
-
-        if sam_masks is not None:
-            self._labels["sam_masks"] = (sam_masks, fo.Segmentation)
 
         self.tmp_dir = tmp_dir
+        self.has_masks = sam_masks is not None
 
-        selection = [image, image.localpath, label] + [
-            expr for expr, _ in self._labels.values()
-        ]
+        inputs = (
+            {
+                "image": image,
+                "file": image.localpath,
+                "label": label,
+                "index": index,
+                "connected_components": connected_components,
+                "bounding_boxes": bounding_boxes,
+                "random_points": random_points,
+            }
+            | (
+                {
+                    "sam_logits": sam_logits,
+                }
+                if sam_logits is not None
+                else {}
+            )
+            | (
+                {
+                    "sam_masks": sam_masks,
+                }
+                if sam_masks is not None
+                else {}
+            )
+        )
 
-        df = pxt_table.select(*selection)
+        df = pxt_table.select(*[i for i in inputs.values()])
+
+        self.input_positions = {
+            input_type: pos for pos, input_type in enumerate(inputs)
+        }
         self._row_iter = (
             df._output_row_iterator()
-        )  # iterator over the table rows, to be convered to FiftyOne samples
-
-    def _get_conversion_func(
-        self,
-        label_name: str,
-        image_size: tuple[int, int],
-    ) -> Callable:
-        """Get the conversion function for a specific label name."""
-        if label_name == "connected_components":
-            return self.connected_components_to_fo
-        elif label_name == "bounding_boxes":
-            return partial(
-                self.bounding_boxes_to_fo,
-                img_size=image_size,
-            )
-        elif label_name == "random_points":
-            return partial(
-                self.random_points_to_fo,
-                img_size=image_size,
-            )
-        elif label_name == "sam_logits":
-            return partial(
-                self.sam_logits_to_fo,
-                save_dir=self.tmp_dir,
-            )
-        elif label_name == "sam_masks":
-            return self.sam_masks_to_fo
-        else:
-            raise ValueError(f"Unknown label name: {label_name}. ")
+        )  # iterator over the table rows, to be converted to FiftyOne samples
 
     def __next__(self) -> tuple[str, fo.ImageMetadata, dict[str, fo.Label]]:
         """Access the next row in the Pixeltable and return infos to create a FiftyOne sample.
@@ -227,9 +216,24 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
         The label is used to tag all the FiftyOne objects.
         """
         row = next(self._row_iter)
-        img = row[0]
-        file = row[1]
-        label = row[2]
+        img = row[self.input_positions["image"]]
+        img_size = img.size
+        file = row[self.input_positions["file"]]
+        label = row[self.input_positions["label"]]
+        index = row[self.input_positions["index"]]
+        connected_components = row[self.input_positions["connected_components"]]
+        bounding_boxes = row[self.input_positions["bounding_boxes"]]
+        random_points = row[self.input_positions["random_points"]]
+        sam_logits: None | np.ndarray = (
+            row[self.input_positions["sam_logits"]]
+            if "sam_logits" in self.input_positions
+            else None
+        )
+        sam_masks: None | np.ndarray = (
+            row[self.input_positions["sam_masks"]]
+            if "sam_masks" in self.input_positions
+            else None
+        )
 
         assert isinstance(img, Image), "Image data must be a PIL Image"
         metadata = fo.ImageMetadata(
@@ -240,20 +244,35 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
             filepath=file,
             num_channels=len(img.getbands()),
         )
-
         labels: dict[str, fo.Label] = {}
-        for idx, (label_name, (_, label_cls)) in enumerate(
-            self._labels.items(),
-            start=3,  # the 2 first columns are the image, path and the label
-        ):
-            label_data = row[idx]
-            label_fo = self._get_conversion_func(label_name, img.size)(label_data)
-
-            if label_fo is not None:
-                labels.update(**label_fo)
-
-        for label_fo in labels.values():
-            label_fo.tags.append(label)
+        if connected_components is not None:
+            labels = (
+                self.ground_truth_to_fo(
+                    connected_components=connected_components,
+                    bounding_boxes=bounding_boxes,
+                    label=label,
+                    index=index,
+                    save_dir=self.tmp_dir,
+                    img_size=img_size,
+                )
+                | self.random_points_to_fo(
+                    random_points=random_points,
+                    img_size=img_size,
+                )
+                | (
+                    self.sam_logits_to_fo(
+                        sam_logits=sam_logits,
+                        save_dir=self.tmp_dir,
+                    )
+                    if sam_logits is not None
+                    else {}
+                )
+                | (
+                    self.sam_masks_to_fo(sam_masks=sam_masks)
+                    if sam_masks is not None
+                    else {}
+                )
+            )
 
         return (
             file,
@@ -262,67 +281,59 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
         )
 
     @staticmethod
-    def connected_components_to_fo(
-        connected_components: np.ndarray,
-    ) -> dict[str, fo.Segmentation] | None:
-        """Convert connected components masks to FiftyOne segmentations.
+    def ground_truth_to_fo(
+        connected_components: np.ndarray | None,
+        bounding_boxes: np.ndarray | None,
+        label: str,
+        index: int,
+        save_dir: str,
+        img_size: tuple[int, int],
+    ) -> dict[str, fo.Detections] | None:
+        """Convert connected components and bounding boxes to FiftyOne segmentations.
 
         Args:
             connected_components: An optional array of shape (M, H, W) corresponding to the connected component masks.
+            bounding_boxes: An optional array of shape (M, 4) where M is the number of boxes and each box is represented by its
+            (left, top, right, bottom) coordinates.
+            label: The label to assign to the detections.
+            index: The index of the sample in the dataset.
+            save_dir: Directory to save the masks as images.
+            img_size: A tuple representing the size of the image (width, height).
 
-        Returns: A dictionary with a Segmentation object for each connected component.
+        Returns: A dictionary with a Detections object for each connected component and bounding boxes.
         None if no connected components are provided.
         """
         if connected_components is None:
             return None
 
-        segmentations = {}
-        for idx_mask, mask in enumerate(connected_components):
-            label = f"ground_truth_{idx_mask}"
-            segmentations[label] = fo.Segmentation(
-                mask=mask,
-                label=label,
-            )
-
-        return segmentations
-
-    @staticmethod
-    def bounding_boxes_to_fo(
-        bounding_boxes: np.ndarray | None, img_size: tuple[int, int]
-    ) -> dict[str, fo.Detection] | None:
-        """Convert bounding boxes to FiftyOne detections.
-
-        Args:
-            bounding_boxes: An optional array of bounding boxes with shape (M, 4), where each box is represented
-            with coordinates (x1, y1, x2, y2) corresponding to the left(x)-top(y) and right(x)-bottom(y) corners.
-            img_size: A tuple representing the size of the image (width, height).
-
-        Returns: A dictionary with a Detection object for each bounding box, with coorindates normalized to the image size.
-        None if no bounding boxes are provided.
-        """
-        if bounding_boxes is None:
-            return None
-
         w, h = img_size
-        detections = {}
-        for idx_box, box in enumerate(bounding_boxes):
-            label = f"bounding_box_{idx_box}"
-            detections[label] = fo.Detection(
-                label=label,
-                bounding_box=[
-                    box[0] / w,  # left
-                    box[1] / h,  # top
-                    (box[2] - box[0]) / w,  # width
-                    (box[3] - box[1]) / h,  # height
-                ],
+        detections = []
+        for idx_truth, (connected_component, bounding_box) in enumerate(
+            zip(connected_components, bounding_boxes, strict=True)
+        ):
+            left, top, right, bottom = bounding_box
+            mask = connected_component[top:bottom, left:right]
+            mask_path = f"{save_dir}/{label}_{idx_truth}_{index}.png"
+            cv2.imwrite(mask_path, mask)
+            detections.append(
+                fo.Detection(
+                    mask_path=mask_path,
+                    bounding_box=[
+                        left / w,  # left
+                        top / h,  # top
+                        (right - left) / w,  # width
+                        (bottom - top) / h,  # height
+                    ],
+                    label=label,
+                )
             )
 
-        return detections
+        return {"ground_truth": fo.Detections(detections=detections)}
 
     @staticmethod
     def random_points_to_fo(
         random_points: np.ndarray | None, img_size: tuple[int, int]
-    ) -> dict[str, fo.Keypoint] | None:
+    ) -> dict[str, fo.Keypoints] | None:
         """Convert random points to FiftyOne keypoints.
 
         Args:
@@ -337,16 +348,20 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
             return None
 
         w, h = img_size
-        points = {}
+        points_per_box = {}
         for idx_box, box_points in enumerate(random_points):
+            points = []
             for idx_point, point in enumerate(box_points):
                 label = f"random_point_{idx_box}_{idx_point}"
-                points[label] = fo.Keypoint(
-                    points=[(point[0] / w, point[1] / h)],  # x, y
-                    label=label,
+                points.append(
+                    fo.Keypoint(
+                        points=[(point[0] / w, point[1] / h)],  # x, y
+                        label=label,
+                    )
                 )
+            points_per_box[f"random_points_{idx_box}"] = fo.Keypoints(keypoints=points)
 
-        return points
+        return points_per_box
 
     @staticmethod
     def sam_logits_to_fo(
