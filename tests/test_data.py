@@ -92,6 +92,7 @@ class TestPxtSAMSingleClickDatasetImporter:
         pxt_table = MagicMock()
         image_expr = MagicMock()
         label_expr = MagicMock()
+        index_expr = MagicMock()
         connected_components_expr = MagicMock()
         bounding_boxes_expr = MagicMock()
         random_points_expr = MagicMock()
@@ -109,13 +110,14 @@ class TestPxtSAMSingleClickDatasetImporter:
         img = PIL.Image.new("RGB", (10, 10))
         img.save(image_expr.localpath)
 
-        # Prepare a fake row: [image, mask, box, point, sam_logits, sam_masks, localpath]
+        # Prepare a fake row: [image, file, label, index, connected_components, boxes, points, sam_logits, sam_masks,]
         row = [
             img,
             image_expr.localpath,
             "label",
+            0,
             np.ones((1, 10, 10)),
-            np.ones((1, 4)),
+            np.array([[2, 2, 7, 7]]),  # bounding box
             np.ones((1, 1, 2)),
             np.ones((1, 1, 6, 10, 10)),
             np.ones((1, 1, 10, 10)),
@@ -126,6 +128,7 @@ class TestPxtSAMSingleClickDatasetImporter:
         importer = data.PxtSAMSingleClickDatasetImporter(
             pxt_table=pxt_table,
             image=image_expr,
+            index=index_expr,
             label=label_expr,
             connected_components=connected_components_expr,
             bounding_boxes=bounding_boxes_expr,
@@ -143,11 +146,9 @@ class TestPxtSAMSingleClickDatasetImporter:
         assert isinstance(result[0], str)
         assert isinstance(result[1], fo.ImageMetadata)
         assert isinstance(result[2], dict)
-        assert len(result[2]) == 10
-        assert isinstance(result[2]["ground_truth_0"], fo.Segmentation)
-        assert result[2]["ground_truth_0"].tags == ["label"]
-        assert isinstance(result[2]["bounding_box_0"], fo.Detection)
-        assert isinstance(result[2]["random_point_0_0"], fo.Keypoint)
+        assert len(result[2]) == 9
+        assert isinstance(result[2]["ground_truth"], fo.Detections)
+        assert isinstance(result[2]["random_points_0"], fo.Keypoints)
         assert isinstance(result[2]["sam_logit_0_0_0"], fo.Heatmap)
         assert isinstance(result[2]["sam_logit_0_0_1"], fo.Heatmap)
         assert isinstance(result[2]["sam_logit_0_0_2"], fo.Heatmap)
