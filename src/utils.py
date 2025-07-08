@@ -116,3 +116,12 @@ def setup_pixeltable_for_sam_single_click(
         pxt_table = pxt.get_table(pxt_table_name)
 
     return pxt_table
+
+
+def get_ground_truth_labels_from_pxt_table(
+    pxt_table: catalog.Table,
+) -> set[str]:
+    """Get the labels from the PixelTable table."""
+    return set(
+        [row["label"] for row in pxt_table.select(pxt_table.label).distinct().collect()]
+    )

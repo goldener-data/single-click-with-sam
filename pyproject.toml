@@ -19,6 +19,7 @@ dependencies = [
   "sam-2",
   "hydra-core",
   "huggingface-hub",
+  "mlflow",
 ]
 
 [project.optional-dependencies]
