@@ -57,7 +57,7 @@ def cache_sam_for_single_click_experiments(cfg: DictConfig) -> None:
         architecture, the device and mode to load the model with.
     """
     model_config = cfg.model
-    logger.info(f"Loading the sam: {model_config.hf_id}")
+    logger.info(f"Loading the segment anything model: {model_config.hf_id}")
     model = load_sam2_image_predictor_from_huggingface(model_config, device=cfg.device)
     sam_cache[model_config.hf_id] = model
 

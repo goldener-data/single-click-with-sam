@@ -56,10 +56,14 @@ def get_pxt_table_name_for_sam_single_click(
     run_name: str,
 ) -> str:
     """Generate a unique name for the PixelTable table based on the configuration."""
+    model = cfg.model.hf_id.split("/")[-1]
+    model = model.replace("-", "_")
+    model = model.replace(".", "_")
+
     table_name = (
         cfg.pixeltable.table_name
         if cfg.pixeltable.table_name is not None
-        else f"seed_{cfg.pipeline.seed}_k_{cfg.pipeline.k_shots}_n_{cfg.pipeline.num_points}_amin_{cfg.pipeline.min_area}"
+        else f"model_{model}_seed_{cfg.pipeline.seed}_k_{cfg.pipeline.k_shots}_n_{cfg.pipeline.num_points}_amin_{cfg.pipeline.min_area}"
     )
 
     return f"{run_name}.{table_name}"
@@ -118,10 +122,16 @@ def setup_pixeltable_for_sam_single_click(
     return pxt_table
 
 
-def get_ground_truth_labels_from_pxt_table(
+def get_ground_truth_labels_for_sam_single_click(
     pxt_table: catalog.Table,
 ) -> set[str]:
-    """Get the labels from the PixelTable table."""
+    """Get the list of labels for the experiment.
+
+    The Pixeltable table is expected to have a column 'label' with the ground truth labels.
+
+    Args:
+        pxt_table: The Pixeltable table containing the ground truth labels.
+    """
     return set(
         [row["label"] for row in pxt_table.select(pxt_table.label).distinct().collect()]
     )
