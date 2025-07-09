@@ -58,6 +58,7 @@ class TestGetPxtTableName:
             {
                 "pixeltable": {"table_name": "tbl"},
                 "pipeline": {"seed": 1, "k_shots": 2, "num_points": 3, "min_area": 4},
+                "model": {"hf_id": "foo/bar.baz-2"},
             }
         )
         assert utils.get_pxt_table_name_for_sam_single_click(cfg, "run") == "run.tbl"
@@ -67,11 +68,12 @@ class TestGetPxtTableName:
             {
                 "pixeltable": {"table_name": None},
                 "pipeline": {"seed": 1, "k_shots": 2, "num_points": 3, "min_area": 4},
+                "model": {"hf_id": "foo/bar.baz-2"},
             }
         )
         assert (
             utils.get_pxt_table_name_for_sam_single_click(cfg, "run")
-            == "run.seed_1_k_2_n_3_amin_4"
+            == "run.model_bar_baz_2_seed_1_k_2_n_3_amin_4"
         )
 
 
