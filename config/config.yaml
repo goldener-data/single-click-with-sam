@@ -26,6 +26,9 @@ visualization:
   show_logits: False # show logits in the visualization
   show_mask: True # show mask in the visualization
 
+logging:
+  mlflow_tracking_uri: /storage/ml/mlruns
+
 pixeltable:
   dir_name: null
   run_name: null

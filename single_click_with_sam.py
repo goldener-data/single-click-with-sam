@@ -30,6 +30,7 @@ def run_experiment(cfg: DictConfig) -> None:
         compute_data_extraction,
         compute_segmentation_with_sam,
     )
+    from src.logging import log_experiment_for_sam_single_click
 
     # load the table allowing to run experiments
     pxt_table = setup_pixeltable_for_sam_single_click(cfg)
@@ -55,6 +56,12 @@ def run_experiment(cfg: DictConfig) -> None:
 
     # run the single click segmentation task from the SAM model for all selected random points separately
     compute_segmentation_with_sam(pxt_table=pxt_table, cfg=cfg)
+
+    # log performance metrics in mlflow
+    log_experiment_for_sam_single_click(
+        pxt_table=pxt_table,
+        cfg=cfg,
+    )
 
 
 if __name__ == "__main__":

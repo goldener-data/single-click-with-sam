@@ -1,7 +1,8 @@
 from logging import getLogger
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 
 from omegaconf import DictConfig
+import pixeltable as pxt
 from pixeltable import catalog
 from pixeltable.exprs import Expr
 
@@ -138,3 +139,46 @@ def compute_segmentation_with_sam(
         connected_components=pxt_table.connected_components,
         predicted_masks=pxt_table.sam_masks,
     )
+
+
+@pxt.uda
+class mean_sam_iou(pxt.Aggregator):
+    """Compute the mean IoU of the SAM model masks.
+
+    Args:
+        sam_ious: An optional array of shape (M, num_points) containing the IoU values for each sampled points
+        taken for each connected component.
+    """
+
+    def __init__(self) -> None:
+        self.iou_sum: int = 0
+        self.iou_count: int = 0
+
+    def update(self, sam_ious: Optional[pxt.Array]) -> None:
+        """Aggregate value from each row of the Pixeltable."""
+        if sam_ious is None:
+            return
+
+        for box_sam_iou in sam_ious:
+            for sam_iou in box_sam_iou:
+                self.iou_sum += sam_iou.item()
+                self.iou_count += 1
+
+    def value(self) -> Optional[float]:
+        """Return the mean IoU."""
+        return self.iou_sum / self.iou_count if self.iou_count > 0 else None
+
+
+def get_mean_sam_iou(
+    pxt_table: catalog.Table,
+) -> None | float:
+    """Get the mean IoU from the SAM model predictions.
+
+    Args:
+        pxt_table: The Pixeltable table containing the ious from the sam model.
+
+    Returns: The mean IoU value or None if no IoU values are present.
+    """
+    mean_iou_expr = pxt_table.select(mean_sam_iou(pxt_table.sam_ious))
+    mean_iou = mean_iou_expr.show()[0]["mean_sam_iou"]
+    return float(mean_iou) if mean_iou is not None else None
