@@ -1,0 +1,36 @@
+[project]
+name = "single_click_with_sam"
+version = "0.1.0"
+description = "Single click with SAM - Does SAM really segment anything from a single click?"
+readme = "README.md"
+license = "Apache-2.0"
+license-files= ["LICENSE"]
+authors = [
+    { name = "Yann-CV", email = "yann.chene.tni@gmail.com"}
+]
+
+requires-python = ">=3.10"
+dependencies = [
+  "torch",
+  "opencv-python",
+  "fiftyone",
+  "pixeltable",
+  "any-gold",
+  "sam-2",
+  "hydra-core",
+  "huggingface-hub",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pre-commit",
+  "ruff",
+  "mypy",
+  "types-pillow",
+  "types-tqdm",
+]
+
+[tool.uv.sources]
+any-gold = { git = "https://github.com/goldener-data/any-gold.git" }
+sam-2 = { git = "https://github.com/facebookresearch/sam2.git" }

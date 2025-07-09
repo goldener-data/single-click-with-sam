@@ -1,0 +1,33 @@
+defaults:
+  - _self_
+  - dataset: mvtec_ad
+  - sam@model.config: sam2.1_hiera_l
+
+
+model:
+  hf_id: "facebook/sam2.1-hiera-large"
+  threshold: 0.0 # threshold to binarize the logits
+
+root: /storage/ml/
+device: cpu
+
+load:
+  batch_size: 16
+  num_workers: 2
+
+pipeline:
+  seed: 42
+  k_shots: 10 # how much sample to draw randomly in the dataset
+  min_area: 10 # the minimum area of the segmentation mask to be considered valid in ground truth
+  num_points: 5 # number of single click points to segment from
+  use_bounding_box: True # use bounding box in addition to points
+
+visualization:
+  show_logits: False # show logits in the visualization
+  show_mask: True # show mask in the visualization
+
+pixeltable:
+  dir_name: null
+  run_name: null
+  table_name: null
+  if_exists: ignore
