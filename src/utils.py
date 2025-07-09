@@ -88,7 +88,7 @@ def setup_pixeltable_for_sam_single_click(
     pxt_table_name = get_pxt_table_name_for_sam_single_click(cfg, pxt_run_name)
 
     logger.info(
-        f"Creating the pixeltable directories: {pxt_dir_name} and {pxt_dir_name}"
+        f"Creating the pixeltable directories: {pxt_dir_name} and {pxt_run_name}"
         f"{' (do nothing if they already exist)' if cfg.pixeltable.if_exists != 'replace_force' else ''}:"
     )
     pxt.create_dir(pxt_dir_name, if_exists="ignore")
