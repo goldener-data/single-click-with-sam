@@ -18,7 +18,11 @@ SEED = int(os.environ.get("SEED", 42))
 
 
 def force_seed(seed: int = SEED) -> None:
-    """Force the random seed for reproducibility."""
+    """Force the random seed for reproducibility.
+
+    Args:
+        seed: The seed to initialize the randomness
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -27,7 +31,13 @@ def force_seed(seed: int = SEED) -> None:
 
 
 def get_pxt_dir_name_for_sam_single_click(cfg: DictConfig) -> str:
-    """Generate a unique experiment name for the PixelTable directory based on the configuration."""
+    """Generate a unique experiment name for the PixelTable directory based on the configuration.
+
+    Args:
+        cfg: Configuration allowing to generate the dir name
+
+    Returns: the Pixeltable dir name for the experiment.
+    """
     if cfg.pixeltable.dir_name is None:
         return "sam_single_click"
 
@@ -35,7 +45,13 @@ def get_pxt_dir_name_for_sam_single_click(cfg: DictConfig) -> str:
 
 
 def get_pxt_run_name_for_sam_single_click(cfg: DictConfig) -> str:
-    """Generate a unique name for the PixelTable directory for the run based on the configuration."""
+    """Generate a unique name for the PixelTable directory for the run based on the configuration.
+
+    Args:
+        cfg: Configuration allowing to generate the run name
+
+    Returns: the Pixeltable run name for the experiment.
+    """
     dir_name = get_pxt_dir_name_for_sam_single_click(cfg)
 
     if cfg.pixeltable.run_name is not None:
@@ -55,15 +71,25 @@ def get_pxt_table_name_for_sam_single_click(
     cfg: DictConfig,
     run_name: str,
 ) -> str:
-    """Generate a unique name for the PixelTable table based on the configuration."""
+    """Generate a unique name for the PixelTable table based on the configuration.
+
+    Args:
+        cfg: Configuration allowing to generate the table name
+        run_name: The name of the run, used as a prefix for the table name
+
+    Returns: the Pixeltable table name for the experiment.
+    """
+
+    if cfg.pixeltable.table_name is not None:
+        return f"{run_name}.{cfg.pixeltable.table_name}"
+
     model = cfg.model.hf_id.split("/")[-1]
     model = model.replace("-", "_")
     model = model.replace(".", "_")
 
     table_name = (
-        cfg.pixeltable.table_name
-        if cfg.pixeltable.table_name is not None
-        else f"model_{model}_seed_{cfg.pipeline.seed}_k_{cfg.pipeline.k_shots}_n_{cfg.pipeline.num_points}_amin_{cfg.pipeline.min_area}"
+        f"model_{model}_seed_{cfg.pipeline.seed}_k_{cfg.pipeline.k_shots}"
+        f"_n_{cfg.pipeline.num_points}_amin_{cfg.pipeline.min_area}"
     )
 
     return f"{run_name}.{table_name}"
@@ -72,7 +98,13 @@ def get_pxt_table_name_for_sam_single_click(
 def get_pxt_table_path_for_sam_single_click(
     cfg: DictConfig,
 ) -> str:
-    """Generate the path to the PixelTable table based on the configuration."""
+    """Generate the path to the PixelTable table based on the configuration.
+
+    Args:
+        cfg: Configuration allowing to generate the run name
+
+    Returns: the Pixeltable path for the table of the experiment.
+    """
     run_name = get_pxt_run_name_for_sam_single_click(cfg)
     return get_pxt_table_name_for_sam_single_click(cfg, run_name)
 
