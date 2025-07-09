@@ -330,9 +330,9 @@ def compute_ious_from_sam_masks_and_connected_components(
         for point_predicted_mask in box_predicted_masks:
             intersection = np.logical_and(box_mask, point_predicted_mask)
             union = np.logical_or(box_mask, point_predicted_mask)
-            assert (
-                union > 0
-            ).any(), "Union of masks should be greater than 0 to avoid division by zero"
+            assert (union > 0).any(), (
+                "Union of masks should be greater than 0 to avoid division by zero"
+            )
             iou = (
                 intersection.sum() / union.sum()
             )  # Calculate IoU for the connected component and the predicted mask
