@@ -1,6 +1,6 @@
 # Single click with SAM - Does SAM really segment anything from a single click?
 
-Experiment qualifying the performances of the Segment Anything model in the situation of single clock annotation on data not used during training.
+Experiment qualifying the performances of the Segment Anything model in the situation of single click annotation on data not used during training.
 
 ## Installation
 
