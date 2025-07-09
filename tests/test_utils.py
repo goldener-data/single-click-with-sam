@@ -33,7 +33,7 @@ class TestGetPxtRunName:
         )
         assert (
             utils.get_pxt_run_name_for_sam_single_click(cfg)
-            == "sam_single_click_dir.Bar_train_cat"
+            == "sam_single_click_dir.Bar_train"
         )
 
     def test_without_run_name_but_with_category(self) -> None:
