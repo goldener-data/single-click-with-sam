@@ -23,7 +23,10 @@ class TestGetPxtRunName:
             {
                 "pixeltable": {"run_name": None, "dir_name": "dir"},
                 "dataset": {
-                    "args": {"_target_": "foo.Bar", "split": "train", "category": "cat"}
+                    "args": {
+                        "_target_": "foo.Bar",
+                        "split": "train",
+                    }
                 },
                 "sam": {"name": "sam"},
             }
