@@ -1,0 +1,7 @@
+label: null # fill out the label column in pixeltable
+label_col: null # fill out the label column in pixeltable from another existing column
+
+args:
+  _target_: any_gold.image.deepglobe.DeepGlobeRoadExtraction
+  root: /storage/ml/deepglobe_road_extraction
+  split: train # the test set does not have segmentation masks

@@ -7,8 +7,10 @@ import pixeltable as pxt
 from pixeltable import catalog
 
 from src.pixeltable_compute import get_mean_sam_iou
-from src.utils import get_ground_truth_labels_for_sam_single_click
-
+from src.utils import (
+    get_ground_truth_labels_for_sam_single_click,
+    str_as_valid_python_identifier,
+)
 
 logger = getLogger(__name__)
 
@@ -75,8 +77,10 @@ def log_label_segmentation_performance(
         label: The label for which to log the segmentation performance.
     """
     logger.info(f"Logging segmentation performance for {label}.")
+    clean_label = str_as_valid_python_identifier(label)
+    view_name = f"{clean_label}_view"
     label_view = pxt.create_view(
-        f"{label}_view",
+        view_name,
         pxt_table.select(pxt_table.sam_ious).where(pxt_table.label == label),
         if_exists="ignore",
     )
@@ -86,7 +90,7 @@ def log_label_segmentation_performance(
         return
 
     mlflow.log_metric(
-        key=f"{label}_mean_sam_iou",
+        key=f"{clean_label}_mean_sam_iou",
         value=label_mean_iou,
         run_id=run.info.run_id,
     )

@@ -2,7 +2,6 @@ label: null # fill out the label column in pixeltable
 label_col: null # fill out the label column in pixeltable from another existing column
 
 args:
-  _target_: any_gold.image.mvtec_ad.MVTecADDataset
-  root: /storage/ml/
-  category: hazelnut
-  split: test
+  _target_: any_gold.image.plantseg.PlantSeg
+  root: /storage/ml/plantseg
+  split: train

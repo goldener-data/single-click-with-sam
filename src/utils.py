@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import keyword
 import os
 import random
+import re
+
 from logging import getLogger
 
 import numpy as np
@@ -167,3 +170,22 @@ def get_ground_truth_labels_for_sam_single_click(
     return set(
         [row["label"] for row in pxt_table.select(pxt_table.label).distinct().collect()]
     )
+
+
+def str_as_valid_python_identifier(string: str) -> str:
+    # Step 1: Replace non-alphanumeric chars with underscores
+    cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", string)
+
+    # Step 2: Ensure it starts with letter or underscore
+    if cleaned and not (cleaned[0].isalpha() or cleaned[0] == "_"):
+        cleaned = f"_{cleaned}"
+
+    # Step 3: Handle empty string
+    if not cleaned:
+        cleaned = "_"
+
+    # Step 4: Avoid Python keywords
+    if keyword.iskeyword(cleaned):
+        cleaned = f"{cleaned}_"
+
+    return cleaned
