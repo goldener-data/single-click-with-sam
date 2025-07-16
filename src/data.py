@@ -38,8 +38,8 @@ def load_segmentation_dataset_for_sam_single_click(
 
     Returns: the segmentation dataset specified in configuration.
     """
-    dataset_args = dict(cfg.dataset.args)
-    logger.info(f"Loading the dataset: {cfg.dataset.args._target_}")
+    dataset_args = cfg.dataset.args
+    logger.info(f"Loading the dataset: {dataset_args._target_}")
     dataset = instantiate(dataset_args, transforms=None)
 
     return dataset
