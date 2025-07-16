@@ -95,3 +95,17 @@ class TestGetPxtTablePath:
             utils.get_pxt_table_path_for_sam_single_click(cfg)
             == "sam_single_click_dir.run.tbl"
         )
+
+
+class TestStrAsValidPythonIdentifier:
+    def test_basic(self) -> None:
+        assert utils.str_as_valid_python_identifier("foo-bar") == "foo_bar"
+        assert utils.str_as_valid_python_identifier("123abc") == "_123abc"
+        assert utils.str_as_valid_python_identifier("class") == "class_"
+        assert utils.str_as_valid_python_identifier("") == "_"
+        assert utils.str_as_valid_python_identifier("foo@bar!") == "foo_bar_"
+        assert utils.str_as_valid_python_identifier("with space") == "with_space"
+        assert utils.str_as_valid_python_identifier("def") == "def_"
+        assert (
+            utils.str_as_valid_python_identifier("_already_valid") == "_already_valid"
+        )

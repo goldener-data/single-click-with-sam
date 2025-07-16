@@ -173,6 +173,15 @@ def get_ground_truth_labels_for_sam_single_click(
 
 
 def str_as_valid_python_identifier(string: str) -> str:
+    """Make the string a valid Python identifier.
+
+    it is useful to ensure valid pixeltable names when using external strings.
+
+    Args:
+        string: The input string to be converted into a valid Python identifier.
+
+    Returns: A valid Python identifier string.
+    """
     # Step 1: Replace non-alphanumeric chars with underscores
     cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", string)
 
