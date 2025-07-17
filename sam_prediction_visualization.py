@@ -38,15 +38,8 @@ def show_in_fiftyone(cfg: DictConfig) -> None:
         )
         importer = PxtSAMSingleClickDatasetImporter(
             pxt_table=pxt_table,
-            image=pxt_table.image,
-            label=pxt_table.label,
-            index=pxt_table.index,
-            connected_components=pxt_table.connected_components,
-            bounding_boxes=pxt_table.bounding_boxes,
-            random_points=pxt_table.random_points,
-            sam_logits=pxt_table.sam_logits if cfg.visualization.show_logits else None,
-            sam_masks=pxt_table.sam_masks if cfg.visualization.show_mask else None,
-            sam_ious=pxt_table.sam_ious,
+            show_sam_logits=cfg.visualization.show_sam_logits,
+            show_sam_masks=cfg.visualization.show_sam_mask,
             tmp_dir=tmp_dir,
         )
         fo_dataset = fo.Dataset.from_importer(importer)
