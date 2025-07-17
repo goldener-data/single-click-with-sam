@@ -13,7 +13,6 @@ import torch
 from PIL.Image import Image
 
 from any_gold import AnyVisionSegmentationDataset, AnyRawDataset
-from bson import ObjectId
 from fiftyone.utils import data as foud
 from hydra.utils import instantiate
 from omegaconf import DictConfig
@@ -149,8 +148,15 @@ def import_data_in_table_for_sam_single_click(
 
 
 class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
-    """
-    Implementation of a FiftyOne `DatasetImporter` that reads image data from a Pixeltable table.
+    """FiftyOne `DatasetImporter` loading data from a Pixeltable table during sam single click experiment.
+
+    The importer will use the Pixeltable table to create FiftyOne samples:
+    - connected_components and bounding_boxes are converted to FiftyOne Detections
+    - random_points are converted to FiftyOne Keypoints
+    - sam_logits are converted to FiftyOne Heatmaps with predicted iou as attribute
+    - sam_masks are converted to FiftyOne Segmentations
+    - sam_ious are used to set the confidence of the ground_truth (allow easy visualization) and added as iou value
+     for detections, keypoints, segmentations.
     """
 
     def __init__(
@@ -164,6 +170,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
         random_points: exprs.Expr,
         sam_logits: exprs.Expr | None,
         sam_masks: exprs.Expr | None,
+        sam_ious: exprs.Expr,
         tmp_dir: str,
         dataset_dir: Optional[os.PathLike] = None,
     ):
@@ -183,6 +190,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
                 "connected_components": connected_components,
                 "bounding_boxes": bounding_boxes,
                 "random_points": random_points,
+                "sam_ious": sam_ious,
             }
             | (
                 {
@@ -234,6 +242,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
             if "sam_masks" in self.input_positions
             else None
         )
+        sam_ious = row[self.input_positions["sam_ious"]]
 
         assert isinstance(img, Image), "Image data must be a PIL Image"
         metadata = fo.ImageMetadata(
@@ -250,6 +259,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
                 self.ground_truth_to_fo(
                     connected_components=connected_components,
                     bounding_boxes=bounding_boxes,
+                    sam_ious=sam_ious,
                     label=label,
                     index=index,
                     save_dir=self.tmp_dir,
@@ -257,18 +267,25 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
                 )
                 | self.random_points_to_fo(
                     random_points=random_points,
+                    sam_ious=sam_ious,
                     img_size=img_size,
                 )
                 | (
                     self.sam_logits_to_fo(
                         sam_logits=sam_logits,
+                        index=index,
                         save_dir=self.tmp_dir,
                     )
                     if sam_logits is not None
                     else {}
                 )
                 | (
-                    self.sam_masks_to_fo(sam_masks=sam_masks)
+                    self.sam_masks_to_fo(
+                        sam_masks=sam_masks,
+                        sam_ious=sam_ious,
+                        index=index,
+                        save_dir=self.tmp_dir,
+                    )
                     if sam_masks is not None
                     else {}
                 )
@@ -284,6 +301,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
     def ground_truth_to_fo(
         connected_components: np.ndarray | None,
         bounding_boxes: np.ndarray | None,
+        sam_ious: np.ndarray | None,
         label: str,
         index: int,
         save_dir: str,
@@ -295,25 +313,26 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
             connected_components: An optional array of shape (M, H, W) corresponding to the connected component masks.
             bounding_boxes: An optional array of shape (M, 4) where M is the number of boxes and each box is represented by its
             (left, top, right, bottom) coordinates.
+            sam_ious: An optional array of shape (M, N) where M is the number of boxes and N is the number of points per box,
             label: The label to assign to the detections.
             index: The index of the sample in the dataset.
             save_dir: Directory to save the masks as images.
             img_size: A tuple representing the size of the image (width, height).
 
         Returns: A dictionary with a Detections object for each connected component and bounding boxes.
-        None if no connected components are provided.
+        The confidence is set to the minimum IoU value for each box. None if no connected components are provided.
         """
         if connected_components is None:
             return None
 
         w, h = img_size
         detections = []
-        for idx_truth, (connected_component, bounding_box) in enumerate(
-            zip(connected_components, bounding_boxes, strict=True)
+        for idx_truth, (connected_component, bounding_box, box_sam_ious) in enumerate(
+            zip(connected_components, bounding_boxes, sam_ious, strict=True)
         ):
             left, top, right, bottom = bounding_box
             mask = connected_component[top:bottom, left:right]
-            mask_path = f"{save_dir}/{label}_{idx_truth}_{index}.png"
+            mask_path = f"{save_dir}/{index}_{label}_{idx_truth}.png"
             cv2.imwrite(mask_path, mask)
             detections.append(
                 fo.Detection(
@@ -325,6 +344,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
                         (bottom - top) / h,  # height
                     ],
                     label=label,
+                    confidence=box_sam_ious.min(),
                 )
             )
 
@@ -332,31 +352,38 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
 
     @staticmethod
     def random_points_to_fo(
-        random_points: np.ndarray | None, img_size: tuple[int, int]
+        random_points: np.ndarray | None,
+        sam_ious: np.ndarray | None,
+        img_size: tuple[int, int],
     ) -> dict[str, fo.Keypoints] | None:
         """Convert random points to FiftyOne keypoints.
 
         Args:
             random_points: An optional array of shape (M, N, 2) where M is the number of boxes, N is the number of points per box,
             and each point is represented by its (x, y) coordinates.
+            sam_ious: An optional array of shape (M, N) where M is the number of boxes and N is the number of points per box,
             img_size: A tuple representing the size of the image (width, height).
 
-        Returns: A dictionary with a Keypoint object for each point, with coordinates normalized to the image size.
-        None if no random points are provided.
+        Returns: A dictionary with a Keypoints object for each connected component, with coordinates normalized to the image size.
         """
         if random_points is None:
             return None
 
         w, h = img_size
         points_per_box = {}
-        for idx_box, box_points in enumerate(random_points):
+        for idx_box, (box_points, box_ious) in enumerate(
+            zip(random_points, sam_ious, strict=True)
+        ):
             points = []
-            for idx_point, point in enumerate(box_points):
+            for idx_point, (point, iou) in enumerate(
+                zip(box_points, box_ious, strict=True)
+            ):
                 label = f"random_point_{idx_box}_{idx_point}"
                 points.append(
                     fo.Keypoint(
                         points=[(point[0] / w, point[1] / h)],  # x, y
                         label=label,
+                        iou=iou.item(),
                     )
                 )
             points_per_box[f"random_points_{idx_box}"] = fo.Keypoints(keypoints=points)
@@ -366,6 +393,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
     @staticmethod
     def sam_logits_to_fo(
         sam_logits: np.ndarray | None,
+        index: int,
         save_dir: str,
     ) -> dict[str, fo.Heatmap | fo.Classification] | None:
         """Convert SAM logits to FiftyOne heatmaps and classifications.
@@ -373,6 +401,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
         Args:
             sam_logits: An optional array of shape (M, N, 6, H, W) where M is the number of boxes,
             N is the number of points per box, and each point has 6 logits (3 for the heatmaps and 3 for the ious).
+            index: The index of the sample in the dataset.
             save_dir: Directory to save the heatmaps as images.
 
         Returns: A dictionary with heatmaps and classifications for each logits and ious.
@@ -392,51 +421,62 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
             assert isinstance(heatmap, np.ndarray)
             return heatmap
 
-        heatmaps_and_classifications = {}
+        heatmaps = {}
         for idx_box, box_logits in enumerate(sam_logits):
             for idx_point, logits in enumerate(box_logits):
                 for idx_logits in range(3):
-                    label_iou = f"sam_iou_{idx_box}_{idx_point}_{idx_logits}"
-                    heatmaps_and_classifications[label_iou] = fo.Classification(
-                        label=label_iou,
-                        confidence=logits[idx_logits + 3].max(),
-                    )
-
+                    predicted_iou = logits[idx_logits + 3].max().item()
                     label_logit = f"sam_logit_{idx_box}_{idx_point}_{idx_logits}"
+
                     heatmap = make_heatmap(logits[idx_logits])
-                    map_path = f"{save_dir}/{label_logit}_{ObjectId()}.png"
+                    map_path = f"{save_dir}/{index}_{label_logit}.png"
                     cv2.imwrite(map_path, heatmap)
-                    heatmaps_and_classifications[label_logit] = fo.Heatmap(
+
+                    heatmaps[label_logit] = fo.Heatmap(
                         map_path=map_path,
                         range=[0, 255],
                         label=label_logit,
+                        predicted_iou=predicted_iou,
                     )
 
-        return heatmaps_and_classifications
+        return heatmaps
 
     @staticmethod
     def sam_masks_to_fo(
         sam_masks: None | np.ndarray,
+        sam_ious: None | np.ndarray,
+        index: int,
+        save_dir: str,
     ) -> dict[str, fo.Segmentation] | None:
         """Convert SAM masks to FiftyOne segmentations.
 
         Args:
             sam_masks: An optional array of shape (M, N, H, W) where M is the number of boxes,
             N is the number of points per box, and each point has a binary mask of shape (H, W).
+            sam_ious: An optional array of shape (M, N) where M is the number of boxes and N is the number of points per box,
+            index: The index of the sample in the dataset.
+            save_dir: Directory to save the masks as images.
 
-        Returns: A dictionary with a Segmentation object for each mask.
+        Returns: A dictionary with a Segmentation object for each connected components.
         None if no SAM masks are provided.
         """
         if sam_masks is None:
             return None
 
         segmentations = {}
-        for idx_box, box_mask in enumerate(sam_masks):
-            for idx_point, point_mask in enumerate(box_mask):
+        for idx_box, (box_mask, box_ious) in enumerate(
+            zip(sam_masks, sam_ious, strict=True)
+        ):
+            for idx_point, (point_mask, point_iou) in enumerate(
+                zip(box_mask, box_ious, strict=True)
+            ):
                 label = f"sam_mask_{idx_box}_{idx_point}"
+                mask_path = f"{save_dir}/{index}_{label}.png"
+                cv2.imwrite(mask_path, point_mask)
                 segmentations[label] = fo.Segmentation(
-                    mask=point_mask,
+                    mask_path=mask_path,
                     label=label,
+                    iou=point_iou.item(),
                 )
 
         return segmentations
