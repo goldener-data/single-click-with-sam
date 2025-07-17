@@ -98,6 +98,7 @@ class TestPxtSAMSingleClickDatasetImporter:
         random_points_expr = MagicMock()
         sam_logits_expr = MagicMock()
         sam_masks_expr = MagicMock()
+        sam_ious_expr = MagicMock()
 
         # Mock the image expression to have .col.is_stored and .localpath
         image_expr.col.is_stored = True
@@ -119,6 +120,7 @@ class TestPxtSAMSingleClickDatasetImporter:
             np.ones((1, 10, 10)),
             np.array([[2, 2, 7, 7]]),  # bounding box
             np.ones((1, 1, 2)),
+            np.ones((1, 1)),
             np.ones((1, 1, 6, 10, 10)),
             np.ones((1, 1, 10, 10)),
         ]
@@ -135,6 +137,7 @@ class TestPxtSAMSingleClickDatasetImporter:
             random_points=random_points_expr,
             sam_logits=sam_logits_expr,
             sam_masks=sam_masks_expr,
+            sam_ious=sam_ious_expr,
             tmp_dir=str(tmp_path),
             dataset_dir=None,
         )
@@ -146,13 +149,10 @@ class TestPxtSAMSingleClickDatasetImporter:
         assert isinstance(result[0], str)
         assert isinstance(result[1], fo.ImageMetadata)
         assert isinstance(result[2], dict)
-        assert len(result[2]) == 9
+        assert len(result[2]) == 6
         assert isinstance(result[2]["ground_truth"], fo.Detections)
         assert isinstance(result[2]["random_points_0"], fo.Keypoints)
         assert isinstance(result[2]["sam_logit_0_0_0"], fo.Heatmap)
         assert isinstance(result[2]["sam_logit_0_0_1"], fo.Heatmap)
         assert isinstance(result[2]["sam_logit_0_0_2"], fo.Heatmap)
-        assert isinstance(result[2]["sam_iou_0_0_0"], fo.Classification)
-        assert isinstance(result[2]["sam_iou_0_0_1"], fo.Classification)
-        assert isinstance(result[2]["sam_iou_0_0_2"], fo.Classification)
         assert isinstance(result[2]["sam_mask_0_0"], fo.Segmentation)

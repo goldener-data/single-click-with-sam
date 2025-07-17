@@ -46,6 +46,7 @@ def show_in_fiftyone(cfg: DictConfig) -> None:
             random_points=pxt_table.random_points,
             sam_logits=pxt_table.sam_logits if cfg.visualization.show_logits else None,
             sam_masks=pxt_table.sam_masks if cfg.visualization.show_mask else None,
+            sam_ious=pxt_table.sam_ious,
             tmp_dir=tmp_dir,
         )
         fo_dataset = fo.Dataset.from_importer(importer)
