@@ -232,6 +232,7 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
         connected_components = row[self.input_positions["connected_components"]]
         bounding_boxes = row[self.input_positions["bounding_boxes"]]
         random_points = row[self.input_positions["random_points"]]
+        sam_ious = row[self.input_positions["sam_ious"]]
         sam_logits: None | np.ndarray = (
             row[self.input_positions["sam_logits"]]
             if "sam_logits" in self.input_positions
@@ -242,7 +243,6 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
             if "sam_masks" in self.input_positions
             else None
         )
-        sam_ious = row[self.input_positions["sam_ious"]]
 
         assert isinstance(img, Image), "Image data must be a PIL Image"
         metadata = fo.ImageMetadata(
