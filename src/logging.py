@@ -110,7 +110,8 @@ def log_experiment_for_sam_single_click(
     mlflow.set_tracking_uri(cfg.logging.mlflow_tracking_uri)
 
     table_meta = pxt_table.get_metadata()
-    run_name = table_meta["name"]
+    table_name_splits = table_meta["path"].split(".")
+    run_name = ".".join(table_name_splits[1:])
     experiment_name = table_meta["path"].split(".")[0]
 
     experiment = mlflow.set_experiment(experiment_name)
