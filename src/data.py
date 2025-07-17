@@ -21,7 +21,7 @@ from torchvision.transforms.v2 import functional as F
 
 
 import pixeltable as pxt
-from pixeltable import catalog, exprs
+from pixeltable import catalog
 from pixeltable.type_system import ColumnType
 
 from src.utils import logger
@@ -162,15 +162,8 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
     def __init__(
         self,
         pxt_table: pxt.Table,
-        image: exprs.Expr,
-        index: exprs.Expr,
-        label: exprs.Expr,
-        connected_components: exprs.Expr,
-        bounding_boxes: exprs.Expr,
-        random_points: exprs.Expr,
-        sam_logits: exprs.Expr | None,
-        sam_masks: exprs.Expr | None,
-        sam_ious: exprs.Expr,
+        show_sam_logits: bool,
+        show_sam_masks: bool,
         tmp_dir: str,
         dataset_dir: Optional[os.PathLike] = None,
     ):
@@ -179,31 +172,30 @@ class PxtSAMSingleClickDatasetImporter(foud.LabeledImageDatasetImporter):
         )
 
         self.tmp_dir = tmp_dir
-        self.has_masks = sam_masks is not None
 
         inputs = (
             {
-                "image": image,
-                "file": image.localpath,
-                "label": label,
-                "index": index,
-                "connected_components": connected_components,
-                "bounding_boxes": bounding_boxes,
-                "random_points": random_points,
-                "sam_ious": sam_ious,
+                "image": pxt_table.image,
+                "file": pxt_table.image.localpath,
+                "label": pxt_table.label,
+                "index": pxt_table.index,
+                "connected_components": pxt_table.connected_components,
+                "bounding_boxes": pxt_table.bounding_boxes,
+                "random_points": pxt_table.random_points,
+                "sam_ious": pxt_table.sam_ious,
             }
             | (
                 {
-                    "sam_logits": sam_logits,
+                    "sam_logits": pxt_table.sam_logits,
                 }
-                if sam_logits is not None
+                if show_sam_logits
                 else {}
             )
             | (
                 {
-                    "sam_masks": sam_masks,
+                    "sam_masks": pxt_table.sam_masks,
                 }
-                if sam_masks is not None
+                if show_sam_masks
                 else {}
             )
         )

@@ -90,31 +90,31 @@ class TestPxtSAMSingleClickDatasetImporter:
     def test_importer_next(self, tmp_path: Path) -> None:
         # Setup mocks for pxt_table and exprs
         pxt_table = MagicMock()
-        image_expr = MagicMock()
-        label_expr = MagicMock()
-        index_expr = MagicMock()
-        connected_components_expr = MagicMock()
-        bounding_boxes_expr = MagicMock()
-        random_points_expr = MagicMock()
-        sam_logits_expr = MagicMock()
-        sam_masks_expr = MagicMock()
-        sam_ious_expr = MagicMock()
+        pxt_table.image = MagicMock()
+        pxt_table.label = MagicMock()
+        pxt_table.index = MagicMock()
+        pxt_table.connected_components = MagicMock()
+        pxt_table.bounding_boxes = MagicMock()
+        pxt_table.random_points = MagicMock()
+        pxt_table.sam_ious = MagicMock()
+        pxt_table.sam_logits = MagicMock()
+        pxt_table.sam_masks = MagicMock()
 
         # Mock the image expression to have .col.is_stored and .localpath
-        image_expr.col.is_stored = True
-        image_expr.localpath = str(tmp_path / "image.png")
+        pxt_table.image.col.is_stored = True
+        pxt_table.image.localpath = str(tmp_path / "image.png")
 
         # Mock the DataFrame returned by pxt_table.select
         df_mock = MagicMock()
 
         # Create a dummy image and save it to the local path
         img = PIL.Image.new("RGB", (10, 10))
-        img.save(image_expr.localpath)
+        img.save(pxt_table.image.localpath)
 
         # Prepare a fake row: [image, file, label, index, connected_components, boxes, points, sam_logits, sam_masks,]
         row = [
             img,
-            image_expr.localpath,
+            pxt_table.image.localpath,
             "label",
             0,
             np.ones((1, 10, 10)),
@@ -129,15 +129,8 @@ class TestPxtSAMSingleClickDatasetImporter:
 
         importer = data.PxtSAMSingleClickDatasetImporter(
             pxt_table=pxt_table,
-            image=image_expr,
-            index=index_expr,
-            label=label_expr,
-            connected_components=connected_components_expr,
-            bounding_boxes=bounding_boxes_expr,
-            random_points=random_points_expr,
-            sam_logits=sam_logits_expr,
-            sam_masks=sam_masks_expr,
-            sam_ious=sam_ious_expr,
+            show_sam_logits=True,
+            show_sam_masks=True,
             tmp_dir=str(tmp_path),
             dataset_dir=None,
         )

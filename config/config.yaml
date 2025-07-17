@@ -23,8 +23,8 @@ pipeline:
   use_bounding_box: True # use bounding box in addition to points
 
 visualization:
-  show_logits: False # show logits in the visualization
-  show_mask: True # show mask in the visualization
+  show_sam_logits: False # show logits in the visualization
+  show_sam_mask: True # show mask in the visualization
 
 logging:
   mlflow_tracking_uri: /storage/ml/mlruns
