@@ -17,7 +17,7 @@ load:
 
 pipeline:
   seed: 42
-  k_shots: 2 # how much sample to draw randomly in the dataset
+  k_shots: null # how much sample to draw randomly in the dataset
   min_area: 10 # the minimum area of the segmentation mask to be considered valid in ground truth
   num_points: 1 # number of single click points to segment from
   use_bounding_box: True # use bounding box in addition to points

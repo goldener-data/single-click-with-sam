@@ -101,7 +101,11 @@ def import_data_in_table_for_sam_single_click(
     # add the data in the Pixeltable table
     logger.info("Adding the data of dataset into the Pixeltable table")
     raw_dataset = AnyRawDataset(dataset)
-    sampler = RandomSampler(dataset, replacement=False, num_samples=num_samples)
+    sampler = (
+        RandomSampler(dataset, replacement=False, num_samples=num_samples)
+        if num_samples is not None
+        else None
+    )
     dataloader = DataLoader(
         raw_dataset,
         batch_size=batch_size,

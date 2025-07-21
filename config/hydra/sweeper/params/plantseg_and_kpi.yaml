@@ -1,0 +1,2 @@
+dataset: plantseg,kpi_task1
+dataset.args.split: train,val,test
