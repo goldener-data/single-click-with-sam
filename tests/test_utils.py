@@ -109,3 +109,73 @@ class TestStrAsValidPythonIdentifier:
         assert (
             utils.str_as_valid_python_identifier("_already_valid") == "_already_valid"
         )
+
+
+class TestCheckBoundingBoxesAndPointsForSam:
+    def test_valid_inputs(self) -> None:
+        import numpy as np
+        from src.utils import check_bounding_boxes_and_points_for_sam
+
+        boxes = np.array([[1, 2, 3, 4], [5, 6, 7, 8]])
+        points = np.zeros((2, 3, 2))
+        # Should not raise
+        check_bounding_boxes_and_points_for_sam(boxes, points)
+
+    def test_none_boxes_and_points(self) -> None:
+        from src.utils import check_bounding_boxes_and_points_for_sam
+
+        # Should not raise
+        check_bounding_boxes_and_points_for_sam(None, None)
+
+    def test_none_boxes_with_points(self) -> None:
+        import numpy as np
+        from src.utils import check_bounding_boxes_and_points_for_sam
+
+        points = np.zeros((2, 3, 2))
+        import pytest
+
+        with pytest.raises(ValueError):
+            check_bounding_boxes_and_points_for_sam(None, points)
+
+    def test_boxes_with_none_points(self) -> None:
+        import numpy as np
+        from src.utils import check_bounding_boxes_and_points_for_sam
+
+        boxes = np.array([[1, 2, 3, 4]])
+        import pytest
+
+        with pytest.raises(ValueError):
+            check_bounding_boxes_and_points_for_sam(boxes, None)
+
+    def test_invalid_boxes_shape(self) -> None:
+        import numpy as np
+        from src.utils import check_bounding_boxes_and_points_for_sam
+
+        boxes = np.array([1, 2, 3, 4])
+        points = np.zeros((1, 3, 2))
+        import pytest
+
+        with pytest.raises(ValueError):
+            check_bounding_boxes_and_points_for_sam(boxes, points)
+
+    def test_invalid_points_shape(self) -> None:
+        import numpy as np
+        from src.utils import check_bounding_boxes_and_points_for_sam
+
+        boxes = np.array([[1, 2, 3, 4]])
+        points = np.zeros((1, 3))
+        import pytest
+
+        with pytest.raises(ValueError):
+            check_bounding_boxes_and_points_for_sam(boxes, points)
+
+    def test_mismatched_m(self) -> None:
+        import numpy as np
+        from src.utils import check_bounding_boxes_and_points_for_sam
+
+        boxes = np.array([[1, 2, 3, 4], [5, 6, 7, 8]])
+        points = np.zeros((1, 3, 2))
+        import pytest
+
+        with pytest.raises(ValueError):
+            check_bounding_boxes_and_points_for_sam(boxes, points)

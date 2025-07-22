@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 import numpy as np
+from PIL import Image as PILImage
 
 from src.compute import (
     extract_connected_components_from_binary_mask,
@@ -9,6 +10,7 @@ from src.compute import (
     predict_sam_logits_from_single_click,
     threshold_single_click_sam_logits,
     compute_ious_from_sam_masks_and_connected_components,
+    predict_sam_masks_from_single_click,
 )
 
 
@@ -62,10 +64,11 @@ def mock_sam_model() -> MagicMock:
     mock_model.set_image = MagicMock()
 
     def predict(
-        box: np.ndarray,
+        box: np.ndarray | None,
         point_coords: np.ndarray,
         point_labels: np.ndarray,
         return_logits: bool,
+        multimask_output: bool,
     ) -> tuple[
         np.ndarray,
         np.ndarray,
@@ -213,7 +216,6 @@ class TestPredictSamLogitsFromSingleClick:
         boxes: np.ndarray,
         points: np.ndarray,
     ) -> None:
-        # PIL.Image.Image mock
         img = MagicMock()
 
         result = predict_sam_logits_from_single_click(
@@ -238,44 +240,6 @@ class TestPredictSamLogitsFromSingleClick:
             )
             is None
         )
-
-    def test_predict_sam_logits_invalid(
-        self, mock_sam_model: MagicMock, boxes: np.ndarray, points: np.ndarray
-    ) -> None:
-        # Test with invalid input shapes
-        img = MagicMock()
-
-        with pytest.raises(ValueError):
-            # This will raise a ValueError due to shape mismatch in boxes and points
-            predict_sam_logits_from_single_click(mock_sam_model, img, None, points)
-
-        with pytest.raises(ValueError):
-            predict_sam_logits_from_single_click(mock_sam_model, img, boxes, None)
-
-        with pytest.raises(ValueError):
-            predict_sam_logits_from_single_click(
-                mock_sam_model, img, np.array([[2, 5]]), points
-            )
-
-        with pytest.raises(ValueError):
-            predict_sam_logits_from_single_click(
-                mock_sam_model, img, np.array([[2, 4, 1]]), points
-            )
-
-        with pytest.raises(ValueError):
-            predict_sam_logits_from_single_click(
-                mock_sam_model, img, np.array([[2, 2, 2, 1]]), points
-            )
-
-        with pytest.raises(ValueError):
-            predict_sam_logits_from_single_click(
-                mock_sam_model, img, np.array([[2, 2, 3]]), points
-            )
-
-        with pytest.raises(ValueError):
-            predict_sam_logits_from_single_click(
-                mock_sam_model, img, np.array([[1, 2, 2]]), points
-            )
 
 
 class TestThresholdSingleClickSamLogits:
@@ -369,3 +333,31 @@ class TestComputeIousFromSamMasksAndConnectedComponents:
                 np.ones((1, 10, 10), dtype=np.uint8),
                 np.ones((2, 3, 10, 10), dtype=np.uint8),
             )
+
+
+class TestPredictSamMasksFromSingleClick:
+    def test_predict_masks_basic(
+        self, mock_sam_model: MagicMock, boxes: np.ndarray, points: np.ndarray
+    ) -> None:
+        image = PILImage.new("RGB", (10, 10))
+        masks = predict_sam_masks_from_single_click(
+            model=mock_sam_model,
+            image=image,
+            bounding_boxes=boxes,
+            random_points=points,
+            threshold=0.0,
+            use_bounding_box=True,
+        )
+        assert masks.shape == (2, 1, 10, 10)
+        assert (masks[0, 0, 2:5, 2:5] == 1).all()
+        assert (masks[1, 0, 6:8, 6:8] == 1).all()
+
+    def test_none_points_returns_none(self, mock_sam_model: MagicMock) -> None:
+        image = PILImage.new("RGB", (10, 10))
+        masks = predict_sam_masks_from_single_click(
+            model=mock_sam_model,
+            image=image,
+            bounding_boxes=None,
+            random_points=None,
+        )
+        assert masks is None

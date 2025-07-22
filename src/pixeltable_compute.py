@@ -13,6 +13,7 @@ from src.pixeltable_udf import (
     masks_from_sam_logits,
     segmentation_ious,
     sam_logits_from_single_click,
+    sam_masks_from_single_click,
 )
 
 logger = getLogger(__name__)
@@ -103,33 +104,48 @@ def compute_segmentation_with_sam(
 ) -> None:
     """Compute the segmentation using the SAM model.
 
-    3 columns are generated:
-    - `sam_logits`: logits predicted by the SAM model for each random point
+    2 or 3 columns are generated:
+    - `sam_logits`: logits predicted by the SAM model for each random point if activated
     - `sam_masks`: segmentation masks extracted from the logits
     - `sam_ious`: IoU between the predicted masks and the ground truth mask
     """
+    if cfg.pipeline.compute_logits:
+        # Make a prediction with the SAM model using the random points as single clicks.
+        # SAM is output logits expressing a score regarding the presence of the same object in each pixel.
+        compute_pxt_column(
+            pxt_table,
+            "sam_logits",
+            sam_logits_from_single_click,
+            model_id=cfg.model.hf_id,
+            image=pxt_table.image,
+            boxes=pxt_table.bounding_boxes,
+            points=pxt_table.random_points,
+            use_bounding_box=cfg.model.use_bounding_box,
+        )
 
-    # Make a prediction with the SAM model using the random points as single clicks.
-    # SAM is output logits expressing a score regarding the presence of the same object in each pixel.
-    compute_pxt_column(
-        pxt_table,
-        "sam_logits",
-        sam_logits_from_single_click,
-        model_id=cfg.model.hf_id,
-        image=pxt_table.image,
-        boxes=pxt_table.bounding_boxes,
-        points=pxt_table.random_points,
-    )
-
-    # Keep the most probable segmentation mask from the logits.
-    # This means only the mask with the highest predicted IoU will be kept.
-    compute_pxt_column(
-        pxt_table,
-        "sam_masks",
-        masks_from_sam_logits,
-        sam_logits=pxt_table.sam_logits,
-        threshold=cfg.model.threshold,
-    )
+        # Keep the most probable segmentation mask from the logits.
+        # This means only the mask with the highest predicted IoU will be kept.
+        compute_pxt_column(
+            pxt_table,
+            "sam_masks",
+            masks_from_sam_logits,
+            sam_logits=pxt_table.sam_logits,
+            threshold=cfg.model.threshold,
+        )
+    else:
+        # Keep the most probable segmentation mask from the logits.
+        # This means only the mask with the highest predicted IoU will be kept.
+        compute_pxt_column(
+            pxt_table,
+            "sam_masks",
+            sam_masks_from_single_click,
+            model_id=cfg.model.hf_id,
+            image=pxt_table.image,
+            boxes=pxt_table.bounding_boxes,
+            points=pxt_table.random_points,
+            use_bounding_box=cfg.pipeline.use_bounding_box,
+            threshold=cfg.model.threshold,
+        )
 
     # Compute the IoU between the predicted masks and the ground truth mask.
     compute_pxt_column(

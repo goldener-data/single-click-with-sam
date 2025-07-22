@@ -12,6 +12,7 @@ from src.compute import (
     predict_sam_logits_from_single_click,
     threshold_single_click_sam_logits,
     compute_ious_from_sam_masks_and_connected_components,
+    predict_sam_masks_from_single_click,
 )
 
 
@@ -58,11 +59,12 @@ def sam_logits_from_single_click(
     image: Image,
     boxes: Optional[pxt.Array],
     points: Optional[pxt.Array],
+    use_bounding_box: bool = True,
 ) -> Optional[pxt.Array]:
-    """Predict logits and iou predictions after a single click using the SAM sam.
+    """Predict logits and iou predictions after a single click using the SAM model.
 
     Args:
-        model_id: The identifier of the SAM sam to use.
+        model_id: The identifier of the SAM model to use.
         see `utils.predict_sam_logits_from_single_click for other arguments
 
     See `utils.predict_sam_logits_from_single_click` for more details.
@@ -77,8 +79,43 @@ def sam_logits_from_single_click(
     return predict_sam_logits_from_single_click(
         model=model,
         image=image,
-        boxes=boxes,
-        points=points,
+        bounding_boxes=boxes,
+        random_points=points,
+        use_bounding_box=use_bounding_box,
+    )
+
+
+@pxt.udf
+def sam_masks_from_single_click(
+    model_id: str,
+    image: Image,
+    boxes: Optional[pxt.Array],
+    points: Optional[pxt.Array],
+    threshold: float = 0.0,
+    use_bounding_box: bool = True,
+) -> Optional[pxt.Array]:
+    """Predict binary masks after a single click using the SAM model.
+
+    Args:
+        model_id: The identifier of the SAM model to use.
+        see `utils.predict_sam_masks_from_single_click` for other arguments
+
+    See `utils.predict_sam_masks_from_single_click` for more details.
+    """
+    if model_id not in sam_cache:
+        raise ValueError(
+            f"Model with id {model_id} is not loaded. Please load the sam first."
+        )
+
+    model = sam_cache[model_id]
+
+    return predict_sam_masks_from_single_click(
+        model=model,
+        image=image,
+        bounding_boxes=boxes,
+        random_points=points,
+        threshold=threshold,
+        use_bounding_box=use_bounding_box,
     )
 
 

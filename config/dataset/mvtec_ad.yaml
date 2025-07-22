@@ -3,6 +3,5 @@ label_col: null # fill out the label column in pixeltable from another existing 
 
 args:
   _target_: any_gold.image.mvtec_ad.MVTecADDataset
-  root: /storage/ml/
   category: hazelnut
   split: test

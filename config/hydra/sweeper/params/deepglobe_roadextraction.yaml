@@ -1,0 +1,2 @@
+dataset: deepglobe_roadextraction
+dataset.args.split: train

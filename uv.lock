@@ -163,7 +163,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/3e/38/7859ff46355f76f8d
 [[package]]
 name = "any-gold"
 version = "0.1.0"
-source = { git = "https://github.com/goldener-data/any-gold.git#ad686db9f582ca62dff0f7833b13b6aeb7c83114" }
+source = { git = "https://github.com/goldener-data/any-gold.git#d5ce1daa9e25c7f588a908c1691252583954f58f" }
 dependencies = [
     { name = "datasets" },
     { name = "kagglehub" },

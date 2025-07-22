@@ -198,3 +198,40 @@ def str_as_valid_python_identifier(string: str) -> str:
         cleaned = f"{cleaned}_"
 
     return cleaned
+
+
+def check_bounding_boxes_and_points_for_sam(
+    bounding_boxes: np.ndarray | None,
+    points: np.ndarray | None,
+) -> None:
+    """Check if the bounding boxes and points are valid for SAM.
+
+    Args:
+        bounding_boxes: The bounding boxes to check.
+        points: The random points to check.
+
+    Raises:
+        ValueError: If boxes is None and points is not None.
+        ValueError: If boxes is not None and points is None.
+        ValueError: If boxes is not a 2D array with shape (M, 4).
+        ValueError: If points is not a 3D array with shape (M, num_points, 2).
+        ValueError: If boxes and points do not have the same number of elements (M).
+    """
+    if bounding_boxes is None:
+        if points is not None:
+            raise ValueError("If boxes is None, points should also be None.")
+        return
+    elif points is None:
+        raise ValueError("If boxes is not None, points should not be None.")
+
+    if bounding_boxes.ndim != 2 or bounding_boxes.shape[1] != 4:
+        raise ValueError("Input boxes must be a 2D array with shape (M, 4).")
+
+    if points.ndim != 3 or points.shape[2] != 2:
+        raise ValueError(
+            "Input points must be a 3D array with shape (M, num_points, 2)."
+        )
+    if bounding_boxes.shape[0] != points.shape[0]:
+        raise ValueError(
+            "Input boxes and points must have the same number of elements (M)."
+        )
