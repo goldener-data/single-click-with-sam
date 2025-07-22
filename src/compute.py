@@ -4,6 +4,8 @@ from PIL.Image import Image
 
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
+from src.utils import check_bounding_boxes_and_points_for_sam
+
 
 def extract_connected_components_from_binary_mask(
     mask: np.ndarray, min_area: int = 1
@@ -155,18 +157,19 @@ def extract_random_points_from_connected_components(
 def predict_sam_logits_from_single_click(
     model: SAM2ImagePredictor,
     image: Image,
-    boxes: np.ndarray | None,
-    points: np.ndarray | None,
+    bounding_boxes: np.ndarray | None,
+    random_points: np.ndarray | None,
+    use_bounding_box: bool = True,
 ) -> np.ndarray | None:
-    """Predict logits and iou predictions after a single click using the SAM sam.
+    """Predict logits and iou predictions after a single click using the SAM model.
 
     Args:
-        model: The SAM sam to use.
+        model: The SAM model to use.
         image: The input image to process.
-        boxes: An optional array of bounding boxes with shape (M, 4), where each box is represented
+        bounding_boxes: An optional array of bounding boxes with shape (M, 4), where each box is represented
         with coordinates (x1, y1, x2, y2) corresponding to the left(x)-top(y) and right(x)-bottom(y) corners.
         Multiple SAM logits might be predicted for each box.
-        points: An optional array of shape (M, num_points, 2), where each point is represented
+        random_points: An optional array of shape (M, num_points, 2), where each point is represented
         as (x, y) coordinates. A SAM logits will be predicted for each point.
 
     Returns:
@@ -175,53 +178,39 @@ def predict_sam_logits_from_single_click(
         are converted as map with the same value for all pixel in order to return a single array (pixeltable constraint).
         If boxes is None, returns None.
 
-    Raises:
-        ValueError: If boxes is None and points is not None.
-        ValueError: If boxes is not None and points is None.
-        ValueError: If boxes is not a 2D array with shape (M, 4).
-        ValueError: If points is not a 3D array with shape (M, num_points, 2).
-        ValueError: If boxes and points do not have the same number of elements (M).
+    Raises: See check_bounding_boxes_and_points_for_sam for more details.
     """
-    if boxes is None:
-        if points is not None:
-            raise ValueError("If boxes is None, points should also be None.")
-        return None
-    elif points is None:
-        raise ValueError("If boxes is not None, points should not be None.")
+    check_bounding_boxes_and_points_for_sam(
+        bounding_boxes=bounding_boxes,
+        points=random_points,
+    )
 
-    if boxes.ndim != 2 or boxes.shape[1] != 4:
-        raise ValueError("Input boxes must be a 2D array with shape (M, 4).")
-    if points.ndim != 3 or points.shape[2] != 2:
-        raise ValueError(
-            "Input points must be a 3D array with shape (M, num_points, 2)."
-        )
-    if boxes.shape[0] != points.shape[0]:
-        raise ValueError(
-            "Input boxes and points must have the same number of elements (M)."
-        )
+    if random_points is None:
+        return None
+
     # sam applies preprocessing and compute feature maps
     model.set_image(image)
 
-    masks = []
+    logits = []
 
-    for box, box_points in zip(boxes, points, strict=True):
-        box_masks = []
+    for box, box_points in zip(bounding_boxes, random_points, strict=True):
+        box_logits = []
         labels = np.ones((box_points.shape[0], 1), dtype=np.int64)
 
         for point, label in zip(box_points, labels):
-            sam_masks, iou_predictions, _ = model.predict(
-                box=box,
+            sam_logits, iou_predictions, _ = model.predict(
+                box=box if use_bounding_box else None,
                 point_coords=point[np.newaxis, ...],
                 point_labels=label,
                 return_logits=True,
             )
 
-            box_masks.append(
+            box_logits.append(
                 np.concatenate(
                     [
-                        sam_masks,
+                        sam_logits,
                         (
-                            np.zeros_like(sam_masks)
+                            np.zeros_like(sam_logits)
                             + iou_predictions.reshape(*iou_predictions.shape, 1, 1)
                         ),
                     ],
@@ -229,9 +218,9 @@ def predict_sam_logits_from_single_click(
                 )  # Concatenate masks and iou predictions in the same array to store in a pixeltable
             )
 
-        masks.append(np.stack(box_masks, axis=0))
+        logits.append(np.stack(box_logits, axis=0))
 
-    return np.stack(masks, axis=0)
+    return np.stack(logits, axis=0)
 
 
 def threshold_single_click_sam_logits(
@@ -275,6 +264,70 @@ def threshold_single_click_sam_logits(
                 )  # Apply threshold to the best IoU mask
             )
         sam_masks.append(np.stack(box_masks, axis=0))
+
+    return np.stack(sam_masks, axis=0)
+
+
+def predict_sam_masks_from_single_click(
+    model: SAM2ImagePredictor,
+    image: Image,
+    bounding_boxes: np.ndarray | None,
+    random_points: np.ndarray | None,
+    threshold: float = 0.0,
+    use_bounding_box: bool = True,
+) -> np.ndarray | None:
+    """Predict binary masks after a single click using the SAM model.
+
+    Args:
+        model: The SAM model to use.
+        image: The input image to process.
+        bounding_boxes: An optional array of bounding boxes with shape (M, 4), where each box is represented
+        with coordinates (x1, y1, x2, y2) corresponding to the left(x)-top(y) and right(x)-bottom(y) corners.
+        Multiple SAM logits might be predicted for each box.
+        random_points: An optional array of shape (M, num_points, 2), where each point is represented
+        as (x, y) coordinates. A SAM logits will be predicted for each point.
+        threshold: The threshold to apply to the logits to create binary masks.
+        use_bounding_box: If True, the bounding box will be used to constrain the prediction.
+
+    Returns:
+        Returns: An optional array of shape (M, num_points, H, W) containing the binary masks.
+        If random_points is None, returns None.
+
+    Raises: See check_bounding_boxes_and_points_for_sam for more details.
+    """
+    check_bounding_boxes_and_points_for_sam(
+        bounding_boxes=bounding_boxes,
+        points=random_points,
+    )
+
+    if random_points is None:
+        return None
+
+    model.mask_threshold = threshold
+
+    # sam applies preprocessing and compute feature maps
+    model.set_image(image)
+
+    sam_masks = []
+
+    for box, box_points in zip(bounding_boxes, random_points, strict=True):
+        box_sam_masks = []
+        labels = np.ones((box_points.shape[0], 1), dtype=np.int64)
+
+        for point, label in zip(box_points, labels):
+            sam_mask, _, _ = model.predict(
+                box=box if use_bounding_box else None,
+                point_coords=point[np.newaxis, ...],
+                point_labels=label,
+                return_logits=False,  # return the mask directly
+                multimask_output=False,  # return only the best mask
+            )
+
+            box_sam_masks.append(
+                sam_mask[0]
+            )  # if the image is RGB the mask will have 3 channels
+
+        sam_masks.append(np.stack(box_sam_masks, axis=0))
 
     return np.stack(sam_masks, axis=0)
 
