@@ -203,6 +203,7 @@ def predict_sam_logits_from_single_click(
                 point_coords=point[np.newaxis, ...],
                 point_labels=label,
                 return_logits=True,
+                multimask_output=True,
             )
 
             box_logits.append(
