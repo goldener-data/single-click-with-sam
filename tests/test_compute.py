@@ -11,6 +11,7 @@ from src.compute import (
     threshold_single_click_sam_logits,
     compute_ious_from_sam_masks_and_connected_components,
     predict_sam_masks_from_single_click,
+    sam_execution_time_for_single_click,
 )
 
 
@@ -361,3 +362,25 @@ class TestPredictSamMasksFromSingleClick:
             random_points=None,
         )
         assert masks is None
+
+
+class TestSamExecutionTimeForSingleClick:
+    def test_execution_time_valid(
+        self, mock_sam_model: MagicMock, boxes: np.ndarray, points: np.ndarray
+    ) -> None:
+        img = MagicMock()
+        result = sam_execution_time_for_single_click(mock_sam_model, img, boxes, points)
+        assert result is not None
+        assert set(result.keys()) == {
+            "img_transform_and_encoding",
+            "mask_prediction",
+            "total",
+        }
+        assert all(isinstance(v, float) for v in result.values())
+
+    def test_execution_time_none_points(
+        self, mock_sam_model: MagicMock, boxes: np.ndarray
+    ) -> None:
+        img = MagicMock()
+        result = sam_execution_time_for_single_click(mock_sam_model, img, None, None)
+        assert result is None

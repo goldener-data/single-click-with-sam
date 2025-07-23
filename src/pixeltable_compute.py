@@ -11,9 +11,10 @@ from src.pixeltable_udf import (
     bounding_boxes,
     random_points,
     masks_from_sam_logits,
-    segmentation_ious,
+    sam_segmentation_ious,
     sam_logits_from_single_click,
     sam_masks_from_single_click,
+    sam_execution_time,
 )
 
 logger = getLogger(__name__)
@@ -34,13 +35,16 @@ def compute_pxt_column(
     pxt_table: catalog.Table,
     column_name: str,
     pxt_udf: Callable,
+    if_exists: str,
     **kwargs: Any,
 ) -> None:
     """Compute a column in the pixeltable if it does not exist or contains errors."""
     pxt_columns = pxt_table.columns()
     if column_name not in pxt_columns:
         logger.info(f"Adding {column_name} column to the Pixeltable table")
-        pxt_table.add_computed_column(**{column_name: pxt_udf(**kwargs)})
+        pxt_table.add_computed_column(
+            if_exists=if_exists, **{column_name: pxt_udf(**kwargs)}
+        )
         return
 
     col = getattr(pxt_table, column_name)
@@ -75,6 +79,7 @@ def compute_data_extraction(
         pxt_table,
         "connected_components",
         connected_components,
+        if_exists=cfg.pixeltable.if_exists,
         mask=pxt_table.mask,
         min_area=cfg.pipeline.min_area,
     )
@@ -84,6 +89,7 @@ def compute_data_extraction(
         pxt_table,
         "bounding_boxes",
         bounding_boxes,
+        if_exists=cfg.pixeltable.if_exists,
         connected_components=pxt_table.connected_components,
     )
 
@@ -93,6 +99,7 @@ def compute_data_extraction(
         pxt_table,
         "random_points",
         random_points,
+        if_exists=cfg.pixeltable.if_exists,
         connected_components=pxt_table.connected_components,
         num_points=cfg.pipeline.num_points,
     )
@@ -116,10 +123,11 @@ def compute_segmentation_with_sam(
             pxt_table,
             "sam_logits",
             sam_logits_from_single_click,
+            if_exists=cfg.pixeltable.if_exists,
             model_id=cfg.model.hf_id,
             image=pxt_table.image,
-            boxes=pxt_table.bounding_boxes,
-            points=pxt_table.random_points,
+            bounding_boxes=pxt_table.bounding_boxes,
+            random_points=pxt_table.random_points,
             use_bounding_box=cfg.model.use_bounding_box,
         )
 
@@ -129,6 +137,7 @@ def compute_segmentation_with_sam(
             pxt_table,
             "sam_masks",
             masks_from_sam_logits,
+            if_exists=cfg.pixeltable.if_exists,
             sam_logits=pxt_table.sam_logits,
             threshold=cfg.model.threshold,
         )
@@ -139,10 +148,11 @@ def compute_segmentation_with_sam(
             pxt_table,
             "sam_masks",
             sam_masks_from_single_click,
+            if_exists=cfg.pixeltable.if_exists,
             model_id=cfg.model.hf_id,
             image=pxt_table.image,
-            boxes=pxt_table.bounding_boxes,
-            points=pxt_table.random_points,
+            bounding_boxes=pxt_table.bounding_boxes,
+            random_points=pxt_table.random_points,
             use_bounding_box=cfg.pipeline.use_bounding_box,
             threshold=cfg.model.threshold,
         )
@@ -151,9 +161,23 @@ def compute_segmentation_with_sam(
     compute_pxt_column(
         pxt_table,
         "sam_ious",
-        segmentation_ious,
+        sam_segmentation_ious,
+        if_exists=cfg.pixeltable.if_exists,
         connected_components=pxt_table.connected_components,
-        predicted_masks=pxt_table.sam_masks,
+        sam_masks=pxt_table.sam_masks,
+    )
+
+    # measure the execution time of the SAM model mask prediction
+    compute_pxt_column(
+        pxt_table,
+        "sam_execution_time",
+        sam_execution_time,
+        if_exists=cfg.pixeltable.if_exists,
+        model_id=cfg.model.hf_id,
+        image=pxt_table.image,
+        bounding_boxes=pxt_table.bounding_boxes,
+        random_points=pxt_table.random_points,
+        use_bounding_box=cfg.pipeline.use_bounding_box,
     )
 
 
@@ -185,6 +209,40 @@ class mean_sam_iou(pxt.Aggregator):
         return self.iou_sum / self.iou_count if self.iou_count > 0 else None
 
 
+@pxt.uda
+class mean_sam_execution_time(pxt.Aggregator):
+    """Compute the mean of the SAM model execution time.
+
+    Args:
+        sam_execution_time: An optional dictionary containing the execution times for each image
+        for a single click segmentation.
+    """
+
+    def __init__(self) -> None:
+        self.time_sums: dict[str, float] = {}
+        self.time_count: int = 0
+
+    def update(self, sam_execution_time: Optional[dict[str, float]]) -> None:
+        """Aggregate value from each row of the Pixeltable."""
+        if sam_execution_time is None:
+            return
+
+        for key, value in sam_execution_time.items():
+            if key not in self.time_sums:
+                self.time_sums[key] = 0.0
+            self.time_sums[key] += value
+
+        self.time_count += 1
+
+    def value(self) -> Optional[dict[str, float]]:
+        """Return the mean execution times."""
+        return (
+            None
+            if self.time_count == 0
+            else {key: value / self.time_count for key, value in self.time_sums.items()}
+        )
+
+
 def get_mean_sam_iou(
     pxt_table: catalog.Table,
 ) -> None | float:
@@ -198,3 +256,24 @@ def get_mean_sam_iou(
     mean_iou_expr = pxt_table.select(mean_sam_iou(pxt_table.sam_ious))
     mean_iou = mean_iou_expr.show()[0]["mean_sam_iou"]
     return float(mean_iou) if mean_iou is not None else None
+
+
+def get_mean_sam_execution_time(
+    pxt_table: catalog.Table,
+) -> None | dict[str, float]:
+    """Get the mean execution time from the SAM model predictions.
+
+    Args:
+        pxt_table: The Pixeltable table containing the execution time from the sam model.
+
+    Returns: The mean execution time values or None if no execution time values are present.
+    """
+    mean_execution_time_expr = pxt_table.select(
+        mean_sam_execution_time(pxt_table.sam_execution_time)
+    )
+    mean_execution_time = mean_execution_time_expr.show()[0]["mean_sam_execution_time"]
+    return (
+        None
+        if mean_execution_time is None
+        else {key: float(value) for key, value in mean_execution_time.items()}
+    )

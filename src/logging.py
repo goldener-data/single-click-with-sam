@@ -6,11 +6,12 @@ import mlflow
 import pixeltable as pxt
 from pixeltable import catalog
 
-from src.pixeltable_compute import get_mean_sam_iou
+from src.pixeltable_compute import get_mean_sam_iou, get_mean_sam_execution_time
 from src.utils import (
     get_ground_truth_labels_for_sam_single_click,
     str_as_valid_python_identifier,
 )
+
 
 logger = getLogger(__name__)
 
@@ -41,7 +42,7 @@ def log_parameters_for_sam_single_click(
     )
 
 
-def log_segmentation_performance(
+def log_sam_segmentation_performance(
     pxt_table: catalog.Table,
     run: mlflow.ActiveRun,
 ) -> None:
@@ -64,12 +65,36 @@ def log_segmentation_performance(
     )
 
 
-def log_label_segmentation_performance(
+def log_sam_execution_time(
+    pxt_table: catalog.Table,
+    run: mlflow.ActiveRun,
+) -> None:
+    """Log the global execution time of the SAM model.
+
+    Args:
+        pxt_table: PixelTable containing the execution time results.
+        run: Active MLFlow run to log metrics to.
+    """
+    logger.info("Logging the execution time for SAM model.")
+    label_mean_execution_time = get_mean_sam_execution_time(pxt_table)
+
+    if label_mean_execution_time is None:
+        return
+
+    for key, value in label_mean_execution_time.items():
+        mlflow.log_metric(
+            key=f"mean_{key}_time",
+            value=value,
+            run_id=run.info.run_id,
+        )
+
+
+def log_sam_label_segmentation_performance(
     pxt_table: catalog.Table,
     run: mlflow.ActiveRun,
     label: str,
 ) -> None:
-    """Log the segmentation performance for a specific label.
+    """Log the SAM segmentation performance for a specific label.
 
     Args:
         pxt_table: PixelTable containing the segmentation results.
@@ -78,7 +103,7 @@ def log_label_segmentation_performance(
     """
     logger.info(f"Logging segmentation performance for {label}.")
     clean_label = str_as_valid_python_identifier(label)
-    view_name = f"{clean_label}_view"
+    view_name = f"{clean_label}_iou_view"
     label_view = pxt.create_view(
         view_name,
         pxt_table.select(pxt_table.sam_ious).where(pxt_table.label == label),
@@ -94,6 +119,39 @@ def log_label_segmentation_performance(
         value=label_mean_iou,
         run_id=run.info.run_id,
     )
+
+
+def log_label_sam_execution_time(
+    pxt_table: catalog.Table,
+    run: mlflow.ActiveRun,
+    label: str,
+) -> None:
+    """Log the SAM execution time for a specific label.
+
+    Args:
+        pxt_table: PixelTable containing the execution time results.
+        run: Active MLFlow run to log metrics to.
+        label: The label for which to log the segmentation performance.
+    """
+    logger.info(f"Logging execution time for {label}.")
+    clean_label = str_as_valid_python_identifier(label)
+    view_name = f"{clean_label}_time_view"
+    label_view = pxt.create_view(
+        view_name,
+        pxt_table.select(pxt_table.sam_execution_time).where(pxt_table.label == label),
+        if_exists="ignore",
+    )
+    label_mean_execution_time = get_mean_sam_execution_time(label_view)
+
+    if label_mean_execution_time is None:
+        return
+
+    for key, value in label_mean_execution_time.items():
+        mlflow.log_metric(
+            key=f"{clean_label}_mean_{key}_time",
+            value=value,
+            run_id=run.info.run_id,
+        )
 
 
 def log_experiment_for_sam_single_click(
@@ -120,12 +178,20 @@ def log_experiment_for_sam_single_click(
         run_name=run_name, experiment_id=experiment.experiment_id
     ) as run:
         log_parameters_for_sam_single_click(cfg, run)
-        log_segmentation_performance(pxt_table=pxt_table, run=run)
+
+        log_sam_segmentation_performance(pxt_table=pxt_table, run=run)
+        log_sam_execution_time(pxt_table=pxt_table, run=run)
+
         labels = get_ground_truth_labels_for_sam_single_click(
             pxt_table=pxt_table,
         )
         for label in labels:
-            log_label_segmentation_performance(
+            log_sam_label_segmentation_performance(
+                pxt_table=pxt_table,
+                run=run,
+                label=label,
+            )
+            log_label_sam_execution_time(
                 pxt_table=pxt_table,
                 run=run,
                 label=label,

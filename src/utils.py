@@ -91,9 +91,11 @@ def get_pxt_table_name_for_sam_single_click(
     model = model.replace(".", "_")
 
     table_name = (
-        f"model_{model}_seed_{cfg.pipeline.seed}_k_{cfg.pipeline.k_shots}"
+        f"model_{model}_seed_{cfg.pipeline.seed}"
         f"_n_{cfg.pipeline.num_points}_amin_{cfg.pipeline.min_area}"
     )
+    if cfg.pipeline.k_shots is not None:
+        table_name += f"_k_{cfg.pipeline.k_shots}"
 
     return f"{run_name}.{table_name}"
 
