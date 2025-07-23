@@ -1,3 +1,6 @@
+import time
+from typing import Optional
+
 import cv2
 import numpy as np
 from PIL.Image import Image
@@ -335,13 +338,13 @@ def predict_sam_masks_from_single_click(
 
 def compute_ious_from_sam_masks_and_connected_components(
     connected_components: np.ndarray | None,
-    predicted_masks: np.ndarray | None,
+    sam_masks: np.ndarray | None,
 ) -> np.ndarray | None:
     """Calculate the Intersection over Union (IoU) for the connected components and predicted masks.
 
     Args:
         connected_components: An optional array of shape (M, H, W) corresponding to the connected component masks.
-        predicted_masks: An optional array of shape (M, num_points, H, W) containing the binary masks
+        sam_masks: An optional array of shape (M, num_points, H, W) containing the binary masks
         obtained from the SAM logits.
 
     Returns:
@@ -349,41 +352,39 @@ def compute_ious_from_sam_masks_and_connected_components(
         for each connected component. If connected_components is None, returns None.
 
     Raises:
-        ValueError: If connected_components is None and predicted_masks is not None.
-        ValueError: If connected_components is not None and predicted_masks is None.
+        ValueError: If connected_components is None and sam_masks is not None.
+        ValueError: If connected_components is not None and sam_masks is None.
         ValueError: If connected_components is not a 3D array (M, H, W).
-        ValueError: If predicted_masks is not a 4D array (M, num_points, H, W).
-        ValueError: If connected_components and predicted_masks do not have the same number of elements (M).
+        ValueError: If sam_masks is not a 4D array (M, num_points, H, W).
+        ValueError: If connected_components and sam_masks do not have the same number of elements (M).
     """
     if connected_components is None:
-        if predicted_masks is not None:
+        if sam_masks is not None:
             raise ValueError(
-                "If connected_components is None, predicted_masks should also be None."
+                "If connected_components is None, sam_masks should also be None."
             )
         return None
-    elif predicted_masks is None:
+    elif sam_masks is None:
         raise ValueError(
-            "If connected_components is not None, predicted_masks should not be None."
+            "If connected_components is not None, sam_masks should not be None."
         )
 
     if connected_components.ndim != 3:
         raise ValueError("Input connected_components must be a 3D array (M, H, W).")
-    if predicted_masks.ndim != 4:
+    if sam_masks.ndim != 4:
+        raise ValueError("Input sam_masks must be a 4D array (M, num_points, H, W).")
+    if connected_components.shape[0] != sam_masks.shape[0]:
         raise ValueError(
-            "Input predicted_masks must be a 4D array (M, num_points, H, W)."
-        )
-    if connected_components.shape[0] != predicted_masks.shape[0]:
-        raise ValueError(
-            "Input connected_components and predicted_masks must have the same number of elements (M)."
+            "Input connected_components and sam_masks must have the same number of elements (M)."
         )
 
     ious = []
 
-    for box_mask, box_predicted_masks in zip(connected_components, predicted_masks):
+    for box_mask, box_sam_masks in zip(connected_components, sam_masks):
         box_ious = []
-        for point_predicted_mask in box_predicted_masks:
-            intersection = np.logical_and(box_mask, point_predicted_mask)
-            union = np.logical_or(box_mask, point_predicted_mask)
+        for point_sam_mask in box_sam_masks:
+            intersection = np.logical_and(box_mask, point_sam_mask)
+            union = np.logical_or(box_mask, point_sam_mask)
             assert (union > 0).any(), (
                 "Union of masks should be greater than 0 to avoid division by zero"
             )
@@ -395,3 +396,59 @@ def compute_ious_from_sam_masks_and_connected_components(
         ious.append(np.stack(box_ious, axis=0))
 
     return np.stack(ious, axis=0)
+
+
+def sam_execution_time_for_single_click(
+    model: SAM2ImagePredictor,
+    image: Image,
+    bounding_boxes: np.ndarray | None,
+    random_points: np.ndarray | None,
+    use_bounding_box: bool = True,
+) -> Optional[dict[str, float]]:
+    """Measure the execution time of the SAM model mask prediction for single click segmentation.
+
+    Args:
+        model: The SAM model to use.
+        image: The input image to process.
+        bounding_boxes: An optional array of bounding boxes with shape (M, 4), where each box is represented
+        with coordinates (x1, y1, x2, y2) corresponding to the left(x)-top(y) and right(x)-bottom(y) corners.
+        random_points: An optional array of shape (M, num_points, 2), where each point is represented
+        as (x, y) coordinates. A SAM logits will be predicted for each point.
+        use_bounding_box: If True, the bounding box will be used to constrain the prediction.
+
+    Returns:
+        An optional dictionary containing the execution time in milliseconds for image encoding (including transformation),
+        binary mask prediction and full pass. None if random_points is None.
+
+    Raises: See check_bounding_boxes_and_points_for_sam for more details.
+    """
+    check_bounding_boxes_and_points_for_sam(
+        bounding_boxes=bounding_boxes,
+        points=random_points,
+    )
+
+    if random_points is None:
+        return None
+
+    # take only 1st box and point
+    box = bounding_boxes[0]
+    point = random_points[0][0]
+    label = np.ones((1,), dtype=np.int64)
+
+    start = time.perf_counter() * 1000
+    model.set_image(image)
+    img_transform_and_encoding_time = time.perf_counter() * 1000
+    model.predict(
+        box=box if use_bounding_box else None,
+        point_coords=point[np.newaxis, ...],
+        point_labels=label,
+        return_logits=False,  # return the mask directly
+        multimask_output=False,  # return only the best mask
+    )
+    mask_prediction_time = time.perf_counter() * 1000
+
+    return {
+        "img_transform_and_encoding": img_transform_and_encoding_time - start,
+        "mask_prediction": mask_prediction_time - img_transform_and_encoding_time,
+        "total": mask_prediction_time - start,
+    }

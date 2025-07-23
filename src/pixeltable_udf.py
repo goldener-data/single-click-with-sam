@@ -13,6 +13,7 @@ from src.compute import (
     threshold_single_click_sam_logits,
     compute_ious_from_sam_masks_and_connected_components,
     predict_sam_masks_from_single_click,
+    sam_execution_time_for_single_click,
 )
 
 
@@ -57,8 +58,8 @@ def random_points(
 def sam_logits_from_single_click(
     model_id: str,
     image: Image,
-    boxes: Optional[pxt.Array],
-    points: Optional[pxt.Array],
+    bounding_boxes: Optional[pxt.Array],
+    random_points: Optional[pxt.Array],
     use_bounding_box: bool = True,
 ) -> Optional[pxt.Array]:
     """Predict logits and iou predictions after a single click using the SAM model.
@@ -79,8 +80,8 @@ def sam_logits_from_single_click(
     return predict_sam_logits_from_single_click(
         model=model,
         image=image,
-        bounding_boxes=boxes,
-        random_points=points,
+        bounding_boxes=bounding_boxes,
+        random_points=random_points,
         use_bounding_box=use_bounding_box,
     )
 
@@ -89,8 +90,8 @@ def sam_logits_from_single_click(
 def sam_masks_from_single_click(
     model_id: str,
     image: Image,
-    boxes: Optional[pxt.Array],
-    points: Optional[pxt.Array],
+    bounding_boxes: Optional[pxt.Array],
+    random_points: Optional[pxt.Array],
     threshold: float = 0.0,
     use_bounding_box: bool = True,
 ) -> Optional[pxt.Array]:
@@ -112,8 +113,8 @@ def sam_masks_from_single_click(
     return predict_sam_masks_from_single_click(
         model=model,
         image=image,
-        bounding_boxes=boxes,
-        random_points=points,
+        bounding_boxes=bounding_boxes,
+        random_points=random_points,
         threshold=threshold,
         use_bounding_box=use_bounding_box,
     )
@@ -135,9 +136,9 @@ def masks_from_sam_logits(
 
 
 @pxt.udf
-def segmentation_ious(
+def sam_segmentation_ious(
     connected_components: Optional[pxt.Array],
-    predicted_masks: Optional[pxt.Array],
+    sam_masks: Optional[pxt.Array],
 ) -> Optional[pxt.Array]:
     """Calculate the Intersection over Union (IoU) for the connected components and predicted masks.
 
@@ -145,5 +146,39 @@ def segmentation_ious(
     """
     return compute_ious_from_sam_masks_and_connected_components(
         connected_components=connected_components,
-        predicted_masks=predicted_masks,
+        sam_masks=sam_masks,
+    )
+
+
+@pxt.udf
+def sam_execution_time(
+    model_id: str,
+    image: Image,
+    bounding_boxes: Optional[pxt.Array],
+    random_points: Optional[pxt.Array],
+    use_bounding_box: bool = True,
+) -> Optional[dict[str, float]]:
+    """Measure the execution time of the SAM model mask prediction.
+
+    Args:
+        model_id: The identifier of the SAM model to use.
+        see `utils.sam_execution_time_for_single_click` for other arguments
+
+    Returns:
+        An optional dictionary containing the execution time in milliseconds for image encoding (including transformation),
+        binary mask prediction and full pass. None if random_points is None.
+    """
+    if model_id not in sam_cache:
+        raise ValueError(
+            f"Model with id {model_id} is not loaded. Please load the sam first."
+        )
+
+    model = sam_cache[model_id]
+
+    return sam_execution_time_for_single_click(
+        model=model,
+        image=image,
+        bounding_boxes=bounding_boxes,
+        random_points=random_points,
+        use_bounding_box=use_bounding_box,
     )
