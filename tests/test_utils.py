@@ -73,7 +73,13 @@ class TestGetPxtTableName:
         )
         assert (
             utils.get_pxt_table_name_for_sam_single_click(cfg, "run")
-            == "run.model_bar_baz_2_seed_1_k_2_n_3_amin_4"
+            == "run.model_bar_baz_2_seed_1_n_3_amin_4_k_2"
+        )
+
+        cfg.pipeline.k_shots = None
+        assert (
+            utils.get_pxt_table_name_for_sam_single_click(cfg, "run")
+            == "run.model_bar_baz_2_seed_1_n_3_amin_4"
         )
 
 
