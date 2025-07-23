@@ -1,2 +1,3 @@
 dataset: mvtec_ad
 dataset.args.category: bottle,cable, capsule,carpet,grid,hazelnut,leather,metal_nut,pill,screw,tile,toothbrush,transistor,wood,zipper
+pipeline.use_bounding_box: False,True

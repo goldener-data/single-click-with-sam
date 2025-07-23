@@ -1,2 +1,3 @@
 dataset: plantseg,kpi_task1
 dataset.args.split: train,val,test
+pipeline.use_bounding_box: False,True

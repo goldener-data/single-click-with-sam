@@ -1,11 +1,11 @@
 defaults:
   - _self_
   - dataset: plantseg
-  - sam@model.config: sam2.1_hiera_l
+  - sam@model.config: sam2.1_hiera_l # choose between: sam2.1_hiera_l sam2.1_hiera_t  sam2.1_hiera_s sam2.1_hiera_b+
 
 
 model:
-  hf_id: "facebook/sam2.1-hiera-large"
+  hf_id: facebook/sam2.1-hiera-large # choose between: facebook/sam2.1-hiera-large facebook/sam2.1-hiera-tiny facebook/sam2.1-hiera-small facebook/sam2.1-hiera-base-plus
   threshold: 0.0 # threshold to binarize the logits
 
 root: /storage/ml/
