@@ -154,7 +154,7 @@ def log_label_sam_execution_time(
         )
 
 
-def log_experiment_for_sam_single_click(
+def log_experiment_for_sam_single_click_in_mlflow(
     pxt_table: catalog.Table,
     cfg: DictConfig,
 ) -> None:
@@ -196,3 +196,33 @@ def log_experiment_for_sam_single_click(
                 run=run,
                 label=label,
             )
+
+
+def log_experiment_for_sam_single_click_in_pixeltable(
+    pxt_table: catalog.Table,
+    cfg: DictConfig,
+) -> None:
+    """Log the SAM single click experiment to Pixeltable cloud.
+
+    Args:
+        pxt_table: PixelTable containing the results of the SAM single click experiment.
+        cfg: Configuration object containing experiment parameters.
+    """
+    table_meta = pxt_table.get_metadata()
+    snapshot_name = f"{table_meta['path']}_results"
+
+    logger.info(
+        f"Creating SAM single click experiment Pixeltable snapshot: {snapshot_name}."
+    )
+    snapshot = pxt.create_snapshot(
+        snapshot_name,
+        pxt_table,
+        if_exists=cfg.pixeltable.if_exists,
+        num_retained_versions=1,
+    )
+
+    logger.info(f"Loading Pixeltable snapshot in the cloud: {snapshot_name}.")
+    pxt.create_replica(
+        destination=f"pxt://goldener:main/{snapshot_name}",
+        source=snapshot,
+    )

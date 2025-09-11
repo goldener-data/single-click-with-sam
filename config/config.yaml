@@ -9,7 +9,7 @@ model:
   threshold: 0.0 # threshold to binarize the logits
 
 root: /storage/ml/
-device: cpu
+device: cuda
 
 load:
   batch_size: 16
@@ -35,3 +35,4 @@ pixeltable:
   run_name: null
   table_name: null
   if_exists: ignore
+  to_cloud: True
