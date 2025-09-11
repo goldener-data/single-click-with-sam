@@ -3095,7 +3095,7 @@ wheels = [
 
 [[package]]
 name = "pixeltable"
-version = "0.4.3"
+stashversion = "0.4.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "av" },
@@ -3130,9 +3130,8 @@ dependencies = [
     { name = "toml" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/87/98f0235331bb2d745915ef0d8a6a53fb4fc3fde43ef1f5eb7c7a15363053/pixeltable-0.4.3.tar.gz", hash = "sha256:2ecc0ccdda2677d0d4922e335378a380b8f8d87d94993bb20990a8576b8004f0", size = 368123, upload-time = "2025-07-10T17:08:08.941Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a2/0f/0b7b1f8a0e49f0075139a27c100c97ae5f4691d9a2f921916d11e27e65ca/pixeltable-0.4.3-py3-none-any.whl", hash = "sha256:e1a8f97b129928f147b6117b9cdf2497e7c0b12eaab542071ec8055a41749d0b", size = 462272, upload-time = "2025-07-10T17:08:07.242Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/e0/14d5d0db7bc2b0fed9a235e093e132dae2d3bd2abc3c109e031a711411c6/pixeltable-0.4.12-py3-none-any.whl", hash = "sha256:904d29dc420ff1a8e39faf35d082dcee67fcc77b5bd627d593946510f42b5685", size = 490456, upload-time = "2025-09-05T05:00:15.48Z" },
 ]
 
 [[package]]
