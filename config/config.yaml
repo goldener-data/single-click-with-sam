@@ -31,7 +31,9 @@ logging:
   mlflow_tracking_uri: /storage/ml/mlruns
 
 pixeltable:
+  load_from: null
   dir_name: null
   run_name: null
   table_name: null
   if_exists: ignore
+  to_cloud: True

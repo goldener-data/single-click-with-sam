@@ -10,6 +10,7 @@ import fiftyone as fo
 from src.utils import (
     get_pxt_run_name_for_sam_single_click,
     get_pxt_table_path_for_sam_single_click,
+    load_pixel_table_from_cloud,
 )
 from src.data import PxtSAMSingleClickDatasetImporter
 
@@ -21,16 +22,20 @@ def show_in_fiftyone(cfg: DictConfig) -> None:
     pxt_run_name = get_pxt_run_name_for_sam_single_click(
         cfg,
     )
-    existing_pxt_tables = pxt.list_tables(pxt_run_name, recursive=False)
 
-    pxt_table_name = get_pxt_table_path_for_sam_single_click(cfg)
-    if pxt_table_name not in existing_pxt_tables:
-        raise ValueError(
-            f"PixelTable {pxt_table_name} does not exist. Please run the experiment first."
-        )
+    if cfg.pixeltable.load_from is None:
+        existing_pxt_tables = pxt.list_tables(pxt_run_name, recursive=False)
 
-    logger.info(f"Loading PixelTable: {pxt_table_name}")
-    pxt_table = pxt.get_table(pxt_table_name)
+        pxt_table_name = get_pxt_table_path_for_sam_single_click(cfg)
+        if pxt_table_name not in existing_pxt_tables:
+            raise ValueError(
+                f"PixelTable {pxt_table_name} does not exist. Please run the experiment first."
+            )
+
+        logger.info(f"Loading PixelTable: {pxt_table_name}")
+        pxt_table = pxt.get_table(pxt_table_name)
+    else:
+        pxt_table = load_pixel_table_from_cloud(cfg)
 
     with TemporaryDirectory() as tmp_dir:
         logger.info(

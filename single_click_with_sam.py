@@ -7,6 +7,7 @@ from omegaconf import DictConfig
 from src.utils import (
     force_seed,
     setup_pixeltable_for_sam_single_click,
+    load_pixel_table_from_cloud,
 )
 from src.data import (
     load_segmentation_dataset_for_sam_single_click,
@@ -30,38 +31,50 @@ def run_experiment(cfg: DictConfig) -> None:
         compute_data_extraction,
         compute_segmentation_with_sam,
     )
-    from src.logging import log_experiment_for_sam_single_click
-
-    # load the table allowing to run experiments
-    pxt_table = setup_pixeltable_for_sam_single_click(cfg)
-
-    # cache the model to use it during Pixeltable column computation
-    cache_sam_for_single_click_experiments(cfg)
-
-    # load dataset
-    dataset = load_segmentation_dataset_for_sam_single_click(cfg)
-
-    # add data to the table if required
-    import_data_in_table_for_sam_single_click(
-        cfg=cfg,
-        dataset=dataset,
-        pxt_table=pxt_table,
-        num_samples=cfg.pipeline.k_shots,
-        batch_size=cfg.load.batch_size,
-        num_workers=cfg.load.num_workers,
+    from src.logging import (
+        log_experiment_for_sam_single_click_in_mlflow,
+        log_experiment_for_sam_single_click_in_pixeltable,
     )
 
-    # extract information from the binary mask in order to simulate the single click segmentation task
-    compute_data_extraction(pxt_table=pxt_table, cfg=cfg)
+    if cfg.pixeltable.load_from is None:
+        # load the table allowing to run experiments
+        pxt_table = setup_pixeltable_for_sam_single_click(cfg)
 
-    # run the single click segmentation task from the SAM model for all selected random points separately
-    compute_segmentation_with_sam(pxt_table=pxt_table, cfg=cfg)
+        # cache the model to use it during Pixeltable column computation
+        cache_sam_for_single_click_experiments(cfg)
 
-    # log performance metrics in mlflow
-    log_experiment_for_sam_single_click(
-        pxt_table=pxt_table,
-        cfg=cfg,
-    )
+        # load dataset
+        dataset = load_segmentation_dataset_for_sam_single_click(cfg)
+
+        # add data to the table if required
+        import_data_in_table_for_sam_single_click(
+            cfg=cfg,
+            dataset=dataset,
+            pxt_table=pxt_table,
+            num_samples=cfg.pipeline.k_shots,
+            batch_size=cfg.load.batch_size,
+            num_workers=cfg.load.num_workers,
+        )
+
+        # extract information from the binary mask in order to simulate the single click segmentation task
+        compute_data_extraction(pxt_table=pxt_table, cfg=cfg)
+
+        # run the single click segmentation task from the SAM model for all selected random points separately
+        compute_segmentation_with_sam(pxt_table=pxt_table, cfg=cfg)
+
+    else:
+        # load the table from the cloud
+        pxt_table = load_pixel_table_from_cloud(cfg)
+
+    if cfg.pixeltable.to_cloud and cfg.pixeltable.load_from is None:
+        # move results to the cloud
+        log_experiment_for_sam_single_click_in_pixeltable(pxt_table, cfg)
+    else:
+        # log performance metrics in mlflow
+        log_experiment_for_sam_single_click_in_mlflow(
+            pxt_table=pxt_table,
+            cfg=cfg,
+        )
 
 
 if __name__ == "__main__":

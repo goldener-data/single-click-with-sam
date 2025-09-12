@@ -237,3 +237,52 @@ def check_bounding_boxes_and_points_for_sam(
         raise ValueError(
             "Input boxes and points must have the same number of elements (M)."
         )
+
+
+def load_pixel_table_from_cloud(cfg: DictConfig) -> catalog.Table:
+    """Load a Pixeltable table from cloud storage.
+
+    Args:
+        cfg: Configuration allowing to upload the table
+
+    Returns: The loaded Pixeltable table.
+    """
+    pxt_table_path = cfg.pixeltable.load_from.removeprefix(
+        "pxt://goldener:main/"
+    ).replace("/", ".")
+    pxt_path_splits = pxt_table_path.split(".")
+    pxt_dir = pxt_path_splits[0]
+    pxt_run = ".".join(pxt_path_splits[:-1])
+    existing_pxt_tables = pxt.list_tables("")
+
+    if pxt_table_path in existing_pxt_tables:
+        if cfg.pixeltable.if_exists == "replace_force":
+            logger.warning(
+                f"Removing completely the corresponding Pixeltable directory: {pxt_dir}."
+            )
+            pxt.drop_dir(pxt_dir, force=True)
+            pxt.create_dir(pxt_dir)
+            pxt.create_dir(pxt_run)
+            pxt_table = pxt.create_replica(
+                destination=pxt_table_path,
+                source=cfg.pixeltable.load_from,
+            )
+        else:
+            logger.warning(
+                f"PixelTable {pxt_table_path} already exists. Take it from local cache instead of downloading it again."
+            )
+            pxt_table = pxt.get_table(pxt_table_path)
+    else:
+        logger.info(f"Loading PixelTable from: {cfg.pixeltable.load_from}.")
+        dirs = pxt.list_dirs()
+        if pxt_dir not in dirs:
+            pxt.create_dir(pxt_dir)
+        runs = pxt.list_dirs(pxt_dir)
+        if pxt_run not in runs:
+            pxt.create_dir(pxt_run)
+        pxt_table = pxt.create_replica(
+            destination=pxt_table_path,
+            source=cfg.pixeltable.load_from,
+        )
+
+    return pxt_table
