@@ -245,7 +245,7 @@ def load_pixel_table_from_cloud(cfg: DictConfig) -> catalog.Table:
     Args:
         cfg: Configuration allowing to upload the table
 
-    Returns: The loaded PixelTable.
+    Returns: The loaded Pixeltable table.
     """
     pxt_table_path = cfg.pixeltable.load_from.removeprefix(
         "pxt://goldener:main/"
