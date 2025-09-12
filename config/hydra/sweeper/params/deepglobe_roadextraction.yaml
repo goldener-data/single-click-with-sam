@@ -1,3 +1,4 @@
 dataset: deepglobe_roadextraction
 dataset.args.split: train
 pipeline.use_bounding_box: False,True
+device: cuda

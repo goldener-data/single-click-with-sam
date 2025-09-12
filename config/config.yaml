@@ -9,7 +9,7 @@ model:
   threshold: 0.0 # threshold to binarize the logits
 
 root: /storage/ml/
-device: cuda
+device: cpu
 
 load:
   batch_size: 16
