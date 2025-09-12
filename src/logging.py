@@ -205,7 +205,7 @@ def log_experiment_for_sam_single_click_in_pixeltable(
     """Log the SAM single click experiment to Pixeltable cloud.
 
     Args:
-        pxt_table: PixelTable containing the results of the SAM single click experiment.
+        pxt_table: Pixeltable table containing the results of the SAM single click experiment.
         cfg: Configuration object containing experiment parameters.
     """
     table_meta = pxt_table.get_metadata()
