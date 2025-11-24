@@ -263,9 +263,9 @@ def load_pixel_table_from_cloud(cfg: DictConfig) -> catalog.Table:
             pxt.drop_dir(pxt_dir, force=True)
             pxt.create_dir(pxt_dir)
             pxt.create_dir(pxt_run)
-            pxt_table = pxt.create_replica(
-                destination=pxt_table_path,
-                source=cfg.pixeltable.load_from,
+            pxt_table = pxt.replicate(
+                local_path=pxt_table_path,
+                remote_uri=cfg.pixeltable.load_from,
             )
         else:
             logger.warning(
@@ -280,9 +280,9 @@ def load_pixel_table_from_cloud(cfg: DictConfig) -> catalog.Table:
         runs = pxt.list_dirs(pxt_dir)
         if pxt_run not in runs:
             pxt.create_dir(pxt_run)
-        pxt_table = pxt.create_replica(
-            destination=pxt_table_path,
-            source=cfg.pixeltable.load_from,
+        pxt_table = pxt.replicate(
+            local_path=pxt_table_path,
+            remote_uri=cfg.pixeltable.load_from,
         )
 
     return pxt_table

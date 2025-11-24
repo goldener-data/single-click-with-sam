@@ -222,7 +222,7 @@ def log_experiment_for_sam_single_click_in_pixeltable(
     )
 
     logger.info(f"Loading Pixeltable snapshot in the cloud: {snapshot_name}.")
-    pxt.create_replica(
-        destination=f"pxt://goldener:main/{snapshot_name}",
+    pxt.publish(
+        destination_uri=f"pxt://goldener:main/{snapshot_name}",
         source=snapshot,
     )
